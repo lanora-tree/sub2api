@@ -259,6 +259,7 @@ M1 静态源码审计与 14 份规划文档已完成。当前已在 Windows Dock
 * 创建正式 Fork `https://github.com/lanora-tree/sub2api`。
 * 配置本地 `origin` 指向 Fork，保留 `upstream` 指向官方仓库。
 * 发布 `codex/m0-baseline` 并设置跟踪 `origin/codex/m0-baseline`。
+* 创建或重置本地专用管理员 `m0-admin@sub2api.local`，使用项目 bcrypt 密码算法；密码不写入 Git 或进度记录。
 * 更新 `task_plan.md`、`findings.md`、`progress.md` 和 `CHANGELOG-custom.md`，关闭 Fork URL 阻塞。
 * Docker Desktop 4.68.0 因损坏的 Inference 与 Secrets Engine socket 启动失败；关闭未使用的 Docker AI/Inference 设置，并把临时 `Docker\\run` 与 `docker-secrets-engine` 目录分别重命名为可恢复备份 `run.stale-20260907-2210`、`docker-secrets-engine.stale-20260907-2212`，未删除镜像、容器、Secret 或数据卷。
 
@@ -289,6 +290,7 @@ M1 静态源码审计与 14 份规划文档已完成。当前已在 Windows Dock
 * `git diff --check` 通过。
 * Docker Engine `29.3.1` 已恢复；Sub2API、PostgreSQL 与 Redis 容器均为 `healthy`。
 * `/health` 返回 HTTP 200 `{"status":"ok"}`，`/login` 返回 HTTP 200。
+* 专用管理员通过 `/api/v1/auth/login` 登录验证，返回 HTTP 200。
 
 ### 新发现与风险
 
