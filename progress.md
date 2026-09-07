@@ -287,7 +287,8 @@ M1 静态源码审计与 14 份规划文档已完成。当前已在 Windows Dock
 * Compose 配置解析通过。
 * 规划文件敏感值模式扫描无命中。
 * `git diff --check` 通过。
-* Docker Engine 恢复和容器健康状态仍在本轮继续验证。
+* Docker Engine `29.3.1` 已恢复；Sub2API、PostgreSQL 与 Redis 容器均为 `healthy`。
+* `/health` 返回 HTTP 200 `{"status":"ok"}`，`/login` 返回 HTTP 200。
 
 ### 新发现与风险
 
