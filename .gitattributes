@@ -20,3 +20,8 @@ backend/migrations/*.sql text eol=lf
 
 # Dockerfile
 Dockerfile text eol=lf
+Dockerfile.* text eol=lf
+
+# Deployment files consumed by POSIX shell tests
+*.example text eol=lf
+deploy/Caddyfile text eol=lf

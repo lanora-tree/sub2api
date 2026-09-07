@@ -1,0 +1,10 @@
+services:
+  sub2api:
+    image: sub2api:m0-b1748c4
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        VERSION: 0.2.0-m0
+        COMMIT: b1748c4ea99ce2120401a269142aa071e18a84da
+        DATE: "2026-09-03T07:40:51Z"
