@@ -14,7 +14,6 @@
 
 ### Planned
 
-* M0：在正式 Fork 建立上游原版可运行基线。
 * M2：关闭公开注册、支付、套餐、优惠码、返利、第三方登录和无关入口。
 * M6：实现 CNY 钱包流水、Decimal 热路径、用户模型权限、API Key 摘要、Account credentials 加密和目标 Group 路由基础。
 * M7：实现动态价格规则、不可变版本和 usage 价格快照。
@@ -31,7 +30,7 @@
 * V1 模型清单和初始 CNY 价格。
 * Admin 网络边界、RPO、RTO、备份目标和 Secret Manager。
 
-### M0 in progress
+### M0 completed
 
 * 在 `codex/m0-baseline` 固定上游提交 `b1748c4ea99ce2120401a269142aa071e18a84da`。
 * 新增 `deploy/docker-compose.m0.yml`，构建本地固定 tag `sub2api:m0-b1748c4`，镜像 digest 为 `sha256:74a563871167fbb5c4106b63d7668d247c6fda1470adcec629e6033cfbcb3725`。
@@ -39,7 +38,12 @@
 * Backend unit/integration、Frontend lint/typecheck/251 个 Vitest 文件/production build，以及当前平台适用的 5 个 deploy 测试通过。
 * 增加项目规划文档跟踪规则和 POSIX 部署文件 LF 属性；没有业务代码、schema 或 migration 变更。
 * 创建正式 Fork `https://github.com/lanora-tree/sub2api`，配置为本地 `origin`，保留官方仓库为 `upstream`，并发布 `codex/m0-baseline` 分支。
-* M0 尚待管理员本人确认上游合规声明、创建测试对象并完成模拟 Gateway 与 Streaming 基线。
+* 管理员本人已在 UI 确认 `v2026.06.10` 合规声明；数据库记录已核验，自动化没有代签或绕过门禁。
+* 创建仅含本地无价值数据的测试 Group、User、API Key 与 OpenAI Compatible mock Account；测试对象不记录真实 Provider 凭据。
+* `/v1/models` 返回 `gpt-5.4`；非流式与 Streaming 请求均为 HTTP 200，首个 Streaming 数据帧约 `108.7 ms`，并收到 `[DONE]`。
+* 两条请求均写入 `usage_logs`，每条 7 tokens、成本 `0.0000550000`；测试用户余额从 `100` 变为 `99.99989000`。
+* 模拟账号在验收后设为 inactive，临时 mock 容器与脚本已移除；测试 Group、User 和 Key 保留供本地审计。
+* `upstream/main` 当前为 `4726bdd08b6201d426a80529b79be123a4008d20`，领先固定基线 349 个提交；未在 M0 静默同步。
 
 ### M0 recovery
 

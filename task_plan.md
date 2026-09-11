@@ -6,7 +6,7 @@
 
 ## 2. 当前目标
 
-当前阶段只完成 M0 固定基线、可重复本地运行和验收证据。本阶段不修改 Sub2API 业务逻辑或数据库 schema，不填写任何真实 Provider 凭据。
+M0 固定基线、可重复本地运行和验收证据已完成。当前阶段进入 M2，只关闭公开与商业功能并补齐前后端关闭守卫；不接入任何真实 Provider 凭据，也不提前实施 M6 之后的 schema。
 
 基线：
 
@@ -31,9 +31,9 @@
 
 | Milestone | 目标 | 当前状态 | 主要依赖 |
 | --- | --- | --- | --- |
-| M0 | 准备 Fork 并运行原始系统 | `in_progress` | 管理员合规确认 |
+| M0 | 准备 Fork 并运行原始系统 | `completed` | 已于 2026-09-12 验收 |
 | M1 | 源码分析与设计文档 | `completed` | 当前源码基线 |
-| M2 | 关闭公开与商业功能 | `pending` | M0，M1 |
+| M2 | 关闭公开与商业功能 | `in_progress` | M0，M1 |
 | M3 | Codex Subscription 验证 | `pending` | M2，M6，M7，合规人工确认 |
 | M4 | OpenAI Official API | `pending` | M2，M6，M7 基础接口 |
 | M5 | DeepSeek Official API | `pending` | M2，M6，M7，模型名人工确认 |
@@ -47,7 +47,7 @@
 | M13 | Linux 生产部署 | `pending` | M12 |
 | M14 | 小范围试运行 | `pending` | M13，合规放行 |
 
-M1 文档已基于静态源码分析完成。Windows Docker Desktop 已解除 M0 的工具链阻塞，固定基线的镜像、全栈健康检查、后端与前端测试已通过。正式 Fork `https://github.com/lanora-tree/sub2api` 已创建并配置为 `origin`。M0 尚待管理员本人完成上游合规声明；测试 Group、User、Key、模拟 Gateway 与 Streaming 基线在合规确认后继续。
+M1 文档已基于静态源码分析完成。Windows Docker Desktop 已解除 M0 的工具链阻塞，固定基线的镜像、全栈健康检查、后端与前端测试已通过。正式 Fork `https://github.com/lanora-tree/sub2api` 已创建并配置为 `origin`。管理员本人已完成上游合规声明，M0 测试 Group、User、Key、模拟 Gateway、Streaming 首包与用量落库均已验收；临时模拟上游已移除，测试账号保留为 inactive。
 
 正式执行顺序不是按 Milestone 编号机械递增。基线通过后的主路径为 `M2 -> M6 -> M7 -> M3/M4/M5`；M8 可在 M6 后与 M7 并行设计，但必须在 M12 前验收。M3 到 M5 在 M6、M7 前只允许使用 mock 或专用低额度账号做不收费的技术探测，不得标记 Provider Milestone 完成。
 
@@ -330,8 +330,8 @@ flowchart TD
 
 ## 21. 当前阻塞与人工确认
 
-1. M0 管理端写操作被上游 `v2026.06.10` 合规确认门禁拦截，必须由管理员本人阅读并确认。
-2. Codex Subscription 账号池涉及账号共享与转售限制，M3 前必须获得合规确认。
+1. M0 管理端 `v2026.06.10` 合规确认已由管理员本人完成，门禁阻塞关闭。
+2. Codex Subscription 账号池涉及账号共享与转售限制，M3 前必须获得单独的业务与法律确认。
 3. Sub2API `LICENSE` 为 LGPL 3.0 或更高版本，README_CN 同时写有“无商业授权”声明，分发或收费前需要法律审核。
 4. DeepSeek 已停用两个需求中的旧模型名，需要确认继续保留逻辑别名，或直接改用 V4 公共模型名。
 5. CNY 作为全站权威记账币种，以及现有 USD 语义字段的迁移策略，需要产品负责人确认。

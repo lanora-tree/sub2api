@@ -10,12 +10,13 @@ Sub2API 有条件适合作为本项目底座。它对 Codex、OpenAI Compatible 
 
 ## M0 运行时发现
 
-2026-09-07 已在 Windows Docker Desktop 上解除原工具链阻塞。固定提交的生产镜像、PostgreSQL、Redis、Backend、内嵌 Frontend、后端 unit/integration、前端全量测试与适用平台的部署测试均通过。M0 仍未完成，原因如下：
+2026-09-12 已在 Windows Docker Desktop 上完成 M0。固定提交的生产镜像、PostgreSQL、Redis、Backend、内嵌 Frontend、后端 unit/integration、前端全量测试与适用平台的部署测试均通过。运行时结论如下：
 
-1. 上游管理端在任何管理写操作前强制管理员本人确认 `v2026.06.10` 合规声明。自动化没有代签，也没有绕过门禁写数据库。
+1. 上游管理端在任何管理写操作前强制管理员本人确认 `v2026.06.10` 合规声明。管理员已在 UI 完成确认，数据库记录版本与用户；自动化没有代签或绕过门禁。
 2. 正式 Fork `https://github.com/lanora-tree/sub2api` 已创建；本地 `origin` 与 `upstream` 已按项目规则配置，原 Fork 阻塞关闭。
-3. `upstream/main` 已领先审计提交 77 个提交并发布 `v0.2.1`。其中包含 Gateway、Codex、账单指纹、WebSocket 和图片 URL 安全修复；进入 M2 前需要在专用同步分支审阅，而不能静默改变 M0 审计基线。
+3. `upstream/main` 当前为 `4726bdd08b6201d426a80529b79be123a4008d20`，已领先审计提交 349 个提交。M2 继续从已验收基线开发；上游同步必须在专用分支审阅，不能静默改变 M0 审计基线。
 4. Windows CRLF 检出会使部分 POSIX 精确行匹配部署测试误报。实际配置语义未失败；临时 LF 副本全部通过。项目已补充 `.gitattributes`，保证后续检出一致。
+5. M0 使用本地临时 OpenAI Compatible mock 验证 `gpt-5.4` 模型列表、非流式与 Streaming。两条请求均落入 `usage_logs` 并按上游原始 USD 语义扣费；模拟账号随后设为 inactive，临时容器和脚本已移除。
 
 ## 可以直接复用
 
@@ -58,9 +59,9 @@ Sub2API 有条件适合作为本项目底座。它对 Codex、OpenAI Compatible 
 4. Codex Subscription 与 OpenAI Official API 同属 `openai` 平台，当前 Composite Route 不能锁定目标 Group，存在误选高成本账号池的风险。
 5. Codex、Cursor 和 DeepSeek 协议变化快。DeepSeek 已停用需求指定的两个旧模型名，客户端与模型兼容必须依赖真实版本测试。
 
-## M0 是否可以开始
+## M0 结论
 
-M0 已在 Windows Docker Desktop 开始并完成镜像、全栈、测试和登录基线。宿主机未安装 Go 1.27，但固定的 Go builder 容器已成功执行 unit 与 integration 测试，因此工具链不再是阻塞。正式 Fork 已就绪。M0 状态为 `in_progress`，等待管理员本人合规确认、测试对象和 Gateway/Streaming 基线。
+M0 已完成。宿主机未安装 Go 1.27，但固定的 Go builder 容器已成功执行 unit 与 integration 测试，因此工具链不再是阻塞。正式 Fork、固定镜像、全栈、管理员与普通用户登录、测试对象、模型列表、Gateway、Streaming 首包、用量落库和资源采样均有实际证据。M2 可以在该基线上开始。
 
 ## Codex 开发前需要人工确认
 
@@ -249,13 +250,10 @@ Redis 用于缓存、Session、Sticky、限流、并发和调度状态。钱包�
 
 当前环境证据：
 
-* Node `v24.19.0` 可用。
-* pnpm `11.19.0` 可用。
-* Go 命令不存在。
-* Docker 命令不存在。
-* `pnpm install --frozen-lockfile` 因依赖下载网络审批取消而未完成。
-
-任何 Backend、Frontend 或 Compose 测试均未在本阶段标记通过。
+* Node `v24.19.0` 与 pnpm `11.19.0` 可用。
+* 宿主机 Go 命令不存在；固定的 Go 1.27 builder 镜像可用。
+* Docker Engine `29.3.1` 可用，Compose 全栈健康。
+* Backend unit/integration、Frontend lint/typecheck/251 个 Vitest 文件/production build，以及当前平台适用的 5 个 deploy 测试均已通过。
 
 ## 16. 许可证发现
 
@@ -320,7 +318,7 @@ README_CN 另有以下项目声明：服务条款风险、仅供技术学习研�
 
 ## 20. 待验证事项
 
-1. M0 全栈启动和测试结果。
+1. M2 关闭功能的 UI 消失与直接 API fail closed 结果。
 2. 当前 Codex CLI 的完整 Base URL 配置、header 和协议。
 3. 当前 Cursor 的 endpoint、重试和模型探测。
 4. OpenAI OAuth 账号在目标授权下的合法使用方式。

@@ -304,7 +304,77 @@ Docker Desktop 4.68.0 的 Inference manager 和 Secrets Engine 会因遗留 Wind
 
 恢复 M0 容器后，由管理员完成合规确认；随后创建无真实业务数据的测试对象并完成 `/v1/models`、模拟 Gateway 与 Streaming 基线。
 
-## 12. 后续记录模板
+## 12. 2026-09-12 / M0 完成验收
+
+### 目标
+
+在管理员本人完成上游合规确认后，关闭 M0 剩余门禁，创建无真实业务数据的测试对象，并完成模型列表、模拟 Gateway、Streaming、用量落库和资源基线验收。
+
+### 完成任务
+
+* 核验数据库已记录管理员 `v2026.06.10` 合规确认；自动化没有代签或直接写入确认记录。
+* 恢复 Docker Desktop 29.3.1，并确认 PostgreSQL、Redis、Backend 与内嵌 Frontend 健康。
+* 创建或更新测试 Group `m0-mock-openai`、普通用户 `m0-user@sub2api.local`、测试 Key `m0-mock-key` 和模拟账号 `m0-mock-upstream`。
+* 模拟账号只使用本地 Docker 网络和无价值占位凭据，不连接真实 Provider。
+* 验证 `/v1/models`、非流式 `/v1/chat/completions` 与 Streaming `/v1/chat/completions`。
+* 核对两条请求的 usage、成本、首包时间和用户余额变化。
+* 验收后把模拟账号设为 inactive，并移除临时 mock 容器和脚本；未保存或输出测试 Key 明文。
+* 重新抓取官方 `upstream/main` 引用并记录与固定基线的偏差，没有 merge 或 rebase。
+
+### 修改文件
+
+* `task_plan.md`
+* `findings.md`
+* `progress.md`
+* `README-runbook.md`
+* `CHANGELOG-custom.md`
+* Docker Desktop 本地运行时目录备份不纳入 Git：`run.stale-20260912-01` 与 `docker-secrets-engine.stale-20260912-01`
+
+### 数据库变更
+
+没有自定义 schema 或 migration 变更。仅在本地测试数据中创建 Group ID 3、User ID 2、API Key ID 1 和 Account ID 1。Account 最终状态为 inactive。两条 usage 各记录 4 input tokens、3 output tokens 与 `0.0000550000` 成本，测试用户余额由 `100` 变为 `99.99989000`。
+
+### 执行命令
+
+* `docker compose ... ps`、`config --quiet`、`docker stats --no-stream` 和固定镜像 inspect。
+* 管理员与普通用户通过 `/api/v1/auth/login` 登录；普通用户继续访问 `/api/v1/user/profile`。
+* 通过 Admin 与 User API 创建或更新测试 Group、Account、User 和 Key。
+* 本地临时 OpenAI Compatible mock 响应 `/v1/models` 与 `/v1/chat/completions`；验收后移除。
+* PostgreSQL 只读查询核对合规版本、对象绑定、usage、首包时间、成本和余额。
+* `git fetch upstream main` 与 `git rev-list --count b1748c4..upstream/main`。
+
+### 测试结果
+
+| 项目 | 结果 |
+| --- | --- |
+| Compose config | 通过 |
+| 核心组件 | PostgreSQL、Redis、Backend、内嵌 Frontend 健康；应用仅发布 `127.0.0.1:8080` |
+| 页面与健康 | `/health`、`/login`、`/admin/dashboard` 均 HTTP 200 |
+| 登录 | Admin 与普通 User 登录通过，User profile 与预期账号一致 |
+| `/v1/models` | HTTP 200，仅返回测试 Group 允许的 `gpt-5.4` |
+| 非流式 Gateway | HTTP 200，内容 `m0 mock ok`，7 tokens，客户端耗时 `84.9 ms`，request ID `877027cf-d355-4bbf-8172-f9fe12d47b21` |
+| Streaming Gateway | HTTP 200，3 个数据帧，内容 `m0 stream ok`，客户端首帧 `108.7 ms`、总耗时 `140.8 ms`，服务端落库 first token `76 ms`，收到 `[DONE]`，request ID `7678b24f-3a87-4c1f-bcb3-fbb87daf5851` |
+| Usage 与余额 | 2 条 usage 均落库；合计扣费 `0.0001100000`，余额结果精确匹配 |
+| 原始测试 | 固定基线先前已通过 Backend unit/integration、Frontend lint/typecheck/1825 tests/build 和 5 个适用 deploy tests；本次未修改业务源码，无需重复下载或重跑全量套件 |
+| 核心资源采样 | Sub2API `0.89% / 35.92 MiB`，PostgreSQL `0.55% / 63.26 MiB`，Redis `0.21% / 8.559 MiB` |
+| 固定镜像 | `sha256:74a563871167fbb5c4106b63d7668d247c6fda1470adcec629e6033cfbcb3725`，`44582373` bytes |
+
+### 新发现与风险
+
+* OpenAI API Key 账号未探测时默认走 Responses。M0 mock 对 `/v1/responses` 返回 404 后，上游探针正确写入 `openai_responses_supported=false`，随后 Chat Completions 直转成功。
+* `upstream/main` 当前为 `4726bdd08b6201d426a80529b79be123a4008d20`，比固定基线多 349 个提交。M2 继续使用已验收基线；同步需要单独审阅。
+* 上游原始系统仍明文保存 User API Key 与 Account credentials。M0 仅使用无价值测试值；任何真实 Secret 进入系统前必须完成 M6。
+* Docker Desktop 4.68.0 再次遇到遗留 Inference 与 Secrets Engine socket；把精确运行时目录重命名为可恢复备份后恢复，未删除镜像、容器或数据卷。
+
+### 阻塞与待确认
+
+M0 无剩余阻塞。M3 的 Codex Subscription 授权、许可证解释、CNY 迁移、DeepSeek 模型名和生产运维决策仍按各自 Milestone 保持人工门禁。
+
+### 下一步
+
+M0 状态改为 `completed`，M2 改为 `in_progress`。下一项按顺序关闭公开注册、支付、促销、邀请、返利、第三方登录和无关入口，并为直接 API 请求补齐 fail closed 测试。
+
+## 13. 后续记录模板
 
 每次工作结束追加一节，不覆盖历史记录。
 
