@@ -571,6 +571,9 @@ func TestSettingService_InitializeDefaultSettingsPersistsConfiguredForwardedClie
 
 	require.NoError(t, svc.InitializeDefaultSettings(context.Background()))
 	require.JSONEq(t, `["X-Cdn-Ip","True-Client-Ip"]`, repo.values[SettingKeyForwardedClientIPHeaders])
+	require.Equal(t, "false", repo.values[SettingKeyRegistrationEnabled])
+	require.Equal(t, "false", repo.values[SettingKeyPromoCodeEnabled])
+	require.Equal(t, "false", repo.values[SettingKeyChannelMonitorEnabled])
 }
 
 func TestSettingService_UpdateSettings_APIKeyACLTrustForwardedIPRefreshesConfig(t *testing.T) {

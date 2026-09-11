@@ -4,20 +4,20 @@
 
 * 项目代号：中转站
 * 上游项目：Sub2API
-* 记录日期：2026-09-07 UTC+8
-* 当前阶段：M0 固定基线与本地运行验收
-* 阶段状态：`in_progress`
-* 下一阶段：管理员完成合规确认并补齐 M0 测试数据、Gateway 与 Streaming 基线
+* 记录日期：2026-09-12 UTC+8
+* 当前阶段：M2 公开与商业功能范围收口
+* 阶段状态：`completed`
+* 下一阶段：M6 用户、密钥、路由与钱包基础
 
-M1 静态源码审计与 14 份规划文档已完成。当前已在 Windows Docker Desktop 上构建并启动固定提交，完成大部分 M0 运行与测试验收；Sub2API 业务代码、数据库 schema 和 migration 均未修改。
+M0 与 M1 已完成。M2 已在固定基线上实现数据库默认关闭、前端入口/直接路由拦截和后端 fail-closed 守卫；全量前后端测试、生产构建、Compose 配置、数据库迁移及本地黑盒 API 验收均通过。未接入真实 Provider 凭据或真实收费数据。
 
 ## 2. 里程碑看板
 
 | Milestone | 内容 | 状态 | 进度说明 |
 | --- | --- | --- | --- |
-| M0 | Fork 与原始系统运行 | `in_progress` | Fork、镜像、全栈、测试与登录通过；等待管理员合规确认和 Gateway 基线 |
+| M0 | Fork 与原始系统运行 | `completed` | Fork、镜像、全栈、登录、Gateway、Streaming 与用量基线已验收 |
 | M1 | 源码分析与设计文档 | `completed` | 源码审计、方案设计和交叉检查已完成 |
-| M2 | 关闭公开与商业功能 | `pending` | 等待 M0 |
+| M2 | 关闭公开与商业功能 | `completed` | 三层关闭守卫、全量回归、迁移和本地运行验收通过 |
 | M3 | Codex Subscription 验证 | `pending` | 等待 M2、M6、M7、合规确认和合法测试账号 |
 | M4 | OpenAI Official API | `pending` | 等待 M2、M6、M7 的基础能力 |
 | M5 | DeepSeek Official API | `pending` | 等待 M2、M6、M7、模型名和价格人工确认 |
@@ -374,7 +374,85 @@ M0 无剩余阻塞。M3 的 Codex Subscription 授权、许可证解释、CNY �
 
 M0 状态改为 `completed`，M2 改为 `in_progress`。下一项按顺序关闭公开注册、支付、促销、邀请、返利、第三方登录和无关入口，并为直接 API 请求补齐 fail closed 测试。
 
-## 13. 后续记录模板
+## 13. 2026-09-12 / M2 开始：范围收口安全说明
+
+### 目标
+
+用数据库默认开关、前端路由/菜单控制和后端路由守卫共同关闭公开注册、自助支付、优惠码、邀请码、返利、第三方登录、Model Plaza、可用渠道、插件管理与公开渠道监控；保留管理员创建用户、账号密码登录和 Gateway 主链路。
+
+### 安全边界与失败默认
+
+* 后端是最终边界：被关闭功能的直接 API 请求返回稳定的 feature-closed/404 响应，不能仅依赖前端隐藏。
+* 开关读取失败或值缺失时按关闭处理；数据库迁移把目标开关显式写为 `false`。
+* 支付配置入口保留给管理员用于受控恢复，但支付订单、套餐、Webhook 和公开支付页面在关闭时不可用。
+* 不删除上游功能源码；恢复功能必须由管理员显式打开对应开关。
+
+### 计划测试
+
+* 覆盖通用后端功能守卫、注册/支付/Webhook/兑换码/公开页面以及可用渠道与监控的关闭响应。
+* 覆盖前端功能开关、菜单隐藏和直接路由跳转。
+* 回归管理员创建 User、普通 User 登录、API Key/Gateway 相关代码路径与既有测试。
+
+## 14. 2026-09-12 / M2 完成：公开与商业功能范围收口
+
+### 目标
+
+在不删除上游实现的前提下，把 V1 范围外的公开注册、自助商业、第三方登录和无关门户能力改为管理员显式启用，并确保前端隐藏不能被直接 API 请求绕过。
+
+### 完成任务
+
+* 新增通用后端 `featureEnabledGuard`，关闭、缺失、仓储读取失败或服务未注入时统一返回 HTTP 404、`FEATURE_DISABLED` 和功能标识。
+* 注册、优惠码、邀请码、支付订单、公开支付查询、全部支付 Webhook、兑换码、订阅、返利、可用渠道、公开监控、插件 UI 与对应管理 API 均接入服务端守卫；只保留支付配置读写入口供管理员受控恢复。
+* 前端把范围外功能统一改为 opt-in；菜单、直接路由、公开支付回调页和订阅轮询均只在开关明确为 `true` 时启用，设置加载失败时按关闭处理。
+* 新增 forward-only migration `239_v1_scope_defaults.sql`，将 19 个范围开关写为 `false`；该 migration 只在首次升级时执行，后续管理员仍可显式恢复开关。
+* 新增 `deploy/docker-compose.m2.yml`，构建并运行固定本地镜像 `sub2api:m2-scope-closure`。
+
+### 修改文件
+
+* Backend routes：`backend/internal/server/routes/{feature_guard,auth,payment,user,admin}.go` 及关闭状态测试。
+* Settings：`backend/internal/service/setting_features.go`、`setting_parse.go`、`setting_public.go` 及相关测试。
+* Database：`backend/migrations/239_v1_scope_defaults.sql` 与 migration 回归测试。
+* Frontend：`frontend/src/utils/featureFlags.ts`、`router/index.ts`、`App.vue`、Header、Sidebar 与路由/菜单测试。
+* Deployment/docs：`deploy/docker-compose.m2.yml`、计划、运行手册、发现、进度和定制变更日志。
+
+### 数据库变更
+
+* `schema_migrations` 已记录 `239_v1_scope_defaults.sql`。
+* 本地升级库逐项核对 19 个开关，结果全部为 `false`；不包含真实账号、真实 Provider Secret 或真实支付数据。
+
+### 执行命令
+
+* Backend：在固定 Go 1.27 builder 中执行聚焦 routes/migration/unit 测试与 `go test ./...`。
+* Frontend：在固定 Node builder 中执行 `lint:check`、`typecheck`、全量 Vitest 和 production build。
+* Runtime：`docker build`、`docker compose ... config --quiet`、`up -d --force-recreate`、`ps`、`docker logs`、只读 PostgreSQL 查询与本地 HTTP 黑盒检查。
+
+### 测试结果
+
+| 检查 | 结果 |
+| --- | --- |
+| Backend 全量 | `go test ./...` 全部 package 通过 |
+| Frontend 全量 | lint 与 typecheck 通过；251 个文件、1838 个测试通过；production build 通过 |
+| Compose/runtime | Sub2API、PostgreSQL、Redis 全部 healthy；`/health` HTTP 200 |
+| 关闭 API | 注册、优惠码、邀请码、公开支付、Stripe Webhook 均 HTTP 404 + `FEATURE_DISABLED`；Model Plaza HTTP 404 |
+| 开关口径 | Public settings 中注册、支付、订阅购买、优惠/邀请/返利、第三方登录、监控、可用渠道、Model Plaza、插件全部为 `false` |
+| 保留主链路 | 密码登录、Admin User 创建和 Gateway 路由仍存在并保持认证边界；M0 已验收的 Admin/User/Gateway 实现未被 M2 修改，全量回归通过 |
+| 镜像 | `sub2api:m2-scope-closure`，digest `sha256:9c2092111a6a816b276210ae682b99335d415dce25024bf068e6d4fdd0282d27`，44583506 bytes |
+
+### 新发现与风险
+
+* 上游 feature flag 的历史默认并不一致，Payment 与 Channel Monitor 原为 opt-out；M2 已改为前后端一致的 opt-in，避免设置请求失败时暴露入口。
+* Migration 编号 239 基于当前 `upstream/main` 最大编号 238 分配。后续同步上游前仍需在专用分支检查编号与 checksum 冲突。
+* 本地启动日志中的 URL allowlist、trusted proxies、CORS 与 GitHub version sync 警告属于既有开发配置；生产前仍由 M12/M13 收口。
+
+### 阻塞与待确认
+
+M2 无剩余阻塞。M6 涉及权威记账币种、不可变钱包流水、Key 摘要和 Account credential 加密；任何真实凭据或收费数据进入系统前必须完成。
+
+### 下一步
+
+按主路径进入 M6，先固化 CNY/存量数据迁移决策和 schema，再实现钱包事务、用户模型权限、API Key 摘要、Account credential 加密与显式目标 Group 路由。
+
+## 15. 后续记录模板
 
 每次工作结束追加一节，不覆盖历史记录。
 

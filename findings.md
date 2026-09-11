@@ -18,6 +18,16 @@ Sub2API 有条件适合作为本项目底座。它对 Codex、OpenAI Compatible 
 4. Windows CRLF 检出会使部分 POSIX 精确行匹配部署测试误报。实际配置语义未失败；临时 LF 副本全部通过。项目已补充 `.gitattributes`，保证后续检出一致。
 5. M0 使用本地临时 OpenAI Compatible mock 验证 `gpt-5.4` 模型列表、非流式与 Streaming。两条请求均落入 `usage_logs` 并按上游原始 USD 语义扣费；模拟账号随后设为 inactive，临时容器和脚本已移除。
 
+## M2 范围收口结论
+
+2026-09-12 已完成 M2。数据库 migration 将 19 个范围外开关统一写为 `false`；前端菜单、直接路由与后台轮询改为明确 opt-in；后端对注册、优惠/邀请、支付与 Webhook、兑换/订阅、返利、可用渠道、公开监控和插件接口增加统一 fail-closed 守卫。全量 Backend、Frontend、production build 与本地升级库/HTTP 黑盒验收通过。
+
+1. 后端而非前端是最终关闭边界，稳定响应为 HTTP 404、`FEATURE_DISABLED` 和 feature metadata。
+2. Payment、Promo Code、Channel Monitor 等历史 fail-open/opt-out 口径已在 V1 范围内改为 opt-in；设置缺失或读取失败不会重新暴露入口。
+3. 支付配置的 Admin GET/PUT 有意保留，以便管理员受控恢复；订单、套餐、Provider、公开查询和 Webhook 仍受支付总开关保护。
+4. `239_v1_scope_defaults.sql` 基于当前上游最大 migration 编号 238 分配。上游同步仍须先检查文件名和 checksum 冲突。
+5. M2 不删除功能源码，也不修改 Admin 创建 User、密码登录或 Gateway 主链路；M0 的运行证据与 M2 全量回归共同覆盖保留能力。
+
 ## 可以直接复用
 
 1. Gin Gateway routes 与协议处理。
@@ -311,28 +321,25 @@ README_CN 另有以下项目声明：服务条款风险、仅供技术学习研�
 | R14 | 服务器故障 | High | Medium | restart、health、备份、容量告警 | M13 |
 | R15 | 备份无法恢复或 RPO 过大 | Critical | Medium | 基础备份、连续 WAL/PITR、checksum、加密、月度定点恢复演练 | M13 |
 | R16 | target platform 误选成本池 | Critical | High | M6 完成 target Group 锁定、only explicit、唯一约束和无 fallback，M3 到 M5 分别验收 | M6、M3、M4、M5 |
-| R17 | Payment route 关闭不完整 | High | Medium | 统一后端 guard、直接 API 测试 | M2 |
+| R17 | Payment route 关闭不完整 | High | Low | M2 已统一后端 guard 并通过直接 API/全量回归；后续升级持续回归 | M2、每次升级 |
 | R18 | Redis 故障绕过防重放或限流 | High | Medium | 关键路径 fail closed、重启测试 | M8、M12 |
 | R19 | Admin 账号接管 | Critical | Medium | TOTP、step up、IP 限制、审计 | M2、M12 |
 | R20 | 许可证或 README 声明阻止商业计划 | Critical | Medium | 法律审核、保留声明、发布 gate | M14 |
 
 ## 20. 待验证事项
 
-1. M2 关闭功能的 UI 消失与直接 API fail closed 结果。
-2. 当前 Codex CLI 的完整 Base URL 配置、header 和协议。
-3. 当前 Cursor 的 endpoint、重试和模型探测。
-4. OpenAI OAuth 账号在目标授权下的合法使用方式。
-5. DeepSeek V4 thinking 和旧 alias 的最佳兼容方法。
-6. Payment disabled 对所有 public 与 webhook handler 的实际返回。
-7. Password hashing 具体算法与参数。
-8. Account credential 加密后的 Scheduler 性能。
-9. usage log 与 billing transaction 合并后的热点锁性能。
-10. Nginx reload、SSE cancel 和 WebSocket 的实际表现。
+1. 当前 Codex CLI 的完整 Base URL 配置、header 和协议。
+2. 当前 Cursor 的 endpoint、重试和模型探测。
+3. OpenAI OAuth 账号在目标授权下的合法使用方式。
+4. DeepSeek V4 thinking 和旧 alias 的最佳兼容方法。
+5. Password hashing 具体算法与参数。
+6. Account credential 加密后的 Scheduler 性能。
+7. usage log 与 billing transaction 合并后的热点锁性能。
+8. Nginx reload、SSE cancel 和 WebSocket 的实际表现。
 
 ## 21. 建议下一步
 
-1. 完成人工确认清单，尤其是 Subscription 合规与 DeepSeek 模型名。
-2. 在 Windows Docker Desktop 完成 M0，不改业务逻辑。
-3. 将这套文档放入 Fork 根目录并提交独立 planning commit。
-4. M2 先做功能裁剪与关闭状态测试。
-5. M6 的 Secret 和 Decimal 迁移应在任何真实用户或真实凭据进入系统前完成。
+1. 进入 M6 前固化 CNY 权威币种与存量数据迁移决策。
+2. M6 优先完成钱包不可变流水、Decimal 热路径、API Key 摘要和 Account credential 加密。
+3. 同一 Milestone 完成用户模型权限、显式目标 Group 路由与唯一约束，禁止跨成本池 fallback。
+4. 完成人工确认清单，尤其是 Subscription 合规与 DeepSeek 模型名。

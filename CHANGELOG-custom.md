@@ -14,7 +14,6 @@
 
 ### Planned
 
-* M2：关闭公开注册、支付、套餐、优惠码、返利、第三方登录和无关入口。
 * M6：实现 CNY 钱包流水、Decimal 热路径、用户模型权限、API Key 摘要、Account credentials 加密和目标 Group 路由基础。
 * M7：实现动态价格规则、不可变版本和 usage 价格快照。
 * M8：实现安全的 Internal Recharge API。
@@ -29,6 +28,19 @@
 * DeepSeek 公开逻辑模型名及实际 V4 映射。
 * V1 模型清单和初始 CNY 价格。
 * Admin 网络边界、RPO、RTO、备份目标和 Secret Manager。
+
+### M2 completed
+
+* 新增统一的后端功能关闭守卫。关闭、缺失或读取失败时，注册、优惠/邀请、支付与 Webhook、兑换/订阅、返利、可用渠道、公开监控和插件接口稳定返回 HTTP 404 与 `FEATURE_DISABLED`。
+* 前端范围开关改为明确 opt-in，并为菜单、直接路由、公开支付回调页和订阅轮询增加相同口径的关闭控制。
+* 新增 forward-only migration `239_v1_scope_defaults.sql`，将 19 个 V1 范围外开关设为 `false`；保留源码和 Admin 配置入口以支持受控恢复。
+* 新增 `deploy/docker-compose.m2.yml`，本地镜像 `sub2api:m2-scope-closure` digest 为 `sha256:9c2092111a6a816b276210ae682b99335d415dce25024bf068e6d4fdd0282d27`。
+* Backend `go test ./...` 全部通过；Frontend lint、typecheck、251 个测试文件/1838 个测试和 production build 通过。
+* 本地升级库已记录 migration，19 个开关全部为 `false`；运行栈健康，注册/支付/Webhook 等黑盒请求不能绕过关闭状态。
+
+### M2 recovery
+
+应用代码可回退到 M0 固定镜像；migration 不回滚、不删除。若需恢复单项能力，由管理员在确认风险后显式开启对应开关，并重新执行该能力的安全与 API 验收。
 
 ### M0 completed
 

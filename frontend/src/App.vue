@@ -74,12 +74,6 @@ watch(
         })
       }
 
-      // User logged in: preload subscriptions and start polling
-      subscriptionStore.fetchActiveSubscriptions().catch((error) => {
-        console.error('Failed to preload subscriptions:', error)
-      })
-      subscriptionStore.startPolling()
-
       // Announcements: new login vs page refresh restore
       if (oldValue === false) {
         // New login: delay 3s then force fetch
@@ -98,6 +92,26 @@ watch(
       adminComplianceStore.reset()
       document.removeEventListener('visibilitychange', onVisibilityChange)
     }
+  },
+  { immediate: true }
+)
+
+// Subscription APIs are part of the self-service payment scope. Do not poll a
+// server-side closed route; start only after the opt-in switch is explicitly on.
+watch(
+  [
+    () => authStore.isAuthenticated,
+    () => appStore.cachedPublicSettings?.payment_enabled,
+  ],
+  ([isAuthenticated, paymentEnabled]) => {
+    if (isAuthenticated && paymentEnabled === true) {
+      subscriptionStore.fetchActiveSubscriptions().catch((error) => {
+        console.error('Failed to preload subscriptions:', error)
+      })
+      subscriptionStore.startPolling()
+      return
+    }
+    subscriptionStore.clear()
   },
   { immediate: true }
 )

@@ -1,0 +1,10 @@
+services:
+  sub2api:
+    image: sub2api:m2-scope-closure
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        VERSION: 0.2.0-m2
+        COMMIT: m2-scope-closure
+        DATE: "2026-09-12T00:00:00Z"

@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"context"
+
 	"github.com/Wei-Shaw/sub2api/internal/handler"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -17,6 +19,23 @@ func RegisterUserRoutes(
 	settingService *service.SettingService,
 	panelRateLimiter *middleware.PanelRateLimiter,
 ) {
+	paymentGuard := settingFeatureEnabledGuard(
+		"payment",
+		settingService,
+		func(s *service.SettingService, ctx context.Context) bool { return s.IsPaymentEnabled(ctx) },
+	)
+	affiliateGuard := settingFeatureEnabledGuard(
+		"affiliate",
+		settingService,
+		func(s *service.SettingService, ctx context.Context) bool { return s.IsAffiliateEnabled(ctx) },
+	)
+	availableChannelsGuard := featureEnabledGuard("available_channels", func(ctx context.Context) bool {
+		return settingService != nil && settingService.GetAvailableChannelsRuntime(ctx).Enabled
+	})
+	channelMonitorGuard := featureEnabledGuard("channel_monitor", func(ctx context.Context) bool {
+		return settingService != nil && settingService.GetChannelMonitorRuntime(ctx).Enabled
+	})
+
 	authenticated := v1.Group("")
 	authenticated.Use(gin.HandlerFunc(jwtAuth))
 	authenticated.Use(middleware.BackendModeUserGuard(settingService))
@@ -31,8 +50,8 @@ func RegisterUserRoutes(
 			user.GET("/profile", h.User.GetProfile)
 			user.PUT("/password", h.User.ChangePassword)
 			user.PUT("", h.User.UpdateProfile)
-			user.GET("/aff", h.User.GetAffiliate)
-			user.POST("/aff/transfer", h.User.TransferAffiliateQuota)
+			user.GET("/aff", affiliateGuard, h.User.GetAffiliate)
+			user.POST("/aff/transfer", affiliateGuard, h.User.TransferAffiliateQuota)
 			user.POST("/account-bindings/email/send-code", h.User.SendEmailBindingCode)
 			user.POST("/account-bindings/email", h.User.BindEmailIdentity)
 			user.DELETE("/account-bindings/:provider", h.User.UnbindIdentity)
@@ -91,6 +110,7 @@ func RegisterUserRoutes(
 
 		// 用户可用渠道（非管理员接口）
 		channels := authenticated.Group("/channels")
+		channels.Use(availableChannelsGuard)
 		{
 			channels.GET("/available", h.AvailableChannel.List)
 		}
@@ -121,6 +141,7 @@ func RegisterUserRoutes(
 
 		// 卡密兑换
 		redeem := authenticated.Group("/redeem")
+		redeem.Use(paymentGuard)
 		{
 			redeem.POST("", h.Redeem.Redeem)
 			redeem.GET("/history", h.Redeem.GetHistory)
@@ -128,6 +149,7 @@ func RegisterUserRoutes(
 
 		// 用户订阅
 		subscriptions := authenticated.Group("/subscriptions")
+		subscriptions.Use(paymentGuard)
 		{
 			subscriptions.GET("", h.Subscription.List)
 			subscriptions.GET("/active", h.Subscription.GetActive)
@@ -137,6 +159,7 @@ func RegisterUserRoutes(
 
 		// 渠道监控（用户只读）
 		monitors := authenticated.Group("/channel-monitors")
+		monitors.Use(channelMonitorGuard)
 		{
 			monitors.GET("", h.ChannelMonitor.List)
 			monitors.GET("/:id/status", h.ChannelMonitor.GetStatus)

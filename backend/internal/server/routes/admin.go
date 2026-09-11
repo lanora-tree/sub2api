@@ -2,6 +2,8 @@
 package routes
 
 import (
+	"context"
+
 	"github.com/Wei-Shaw/sub2api/internal/handler"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
@@ -21,7 +23,11 @@ func RegisterAdminRoutes(
 	panelRateLimiter *middleware.PanelRateLimiter,
 ) {
 	// 插件 UI 使用短时能力 URL，仅提供经过安装校验的静态资源。
-	v1.GET("/plugin-ui/:token/*path", h.Admin.Plugin.ServeUIAsset)
+	v1.GET("/plugin-ui/:token/*path", settingFeatureEnabledGuard(
+		"plugin_management",
+		settingService,
+		func(s *service.SettingService, ctx context.Context) bool { return s.IsPluginManagementEnabled(ctx) },
+	), h.Admin.Plugin.ServeUIAsset)
 
 	admin := v1.Group("/admin")
 	admin.Use(gin.HandlerFunc(adminAuth))
@@ -68,10 +74,10 @@ func RegisterAdminRoutes(
 		registerProxyRoutes(admin, h, stepUpAuth)
 
 		// 卡密管理
-		registerRedeemCodeRoutes(admin, h)
+		registerRedeemCodeRoutes(admin, h, settingService)
 
 		// 优惠码管理
-		registerPromoCodeRoutes(admin, h)
+		registerPromoCodeRoutes(admin, h, settingService)
 
 		// 系统设置
 		registerSettingsRoutes(admin, h)
@@ -89,7 +95,7 @@ func RegisterAdminRoutes(
 		registerSystemRoutes(admin, h)
 
 		// 订阅管理
-		registerSubscriptionRoutes(admin, h)
+		registerSubscriptionRoutes(admin, h, settingService)
 
 		// 使用记录管理
 		registerUsageRoutes(admin, h)
@@ -104,7 +110,7 @@ func RegisterAdminRoutes(
 		registerTLSFingerprintProfileRoutes(admin, h)
 
 		// 本地进程插件管理
-		registerPluginRoutes(admin, h, stepUpAuth)
+		registerPluginRoutes(admin, h, stepUpAuth, settingService)
 
 		// API Key 管理
 		registerAdminAPIKeyRoutes(admin, h)
@@ -126,7 +132,7 @@ func RegisterAdminRoutes(
 		registerPromptAuditRoutes(admin, h)
 
 		// 邀请返利（专属用户管理）
-		registerAffiliateRoutes(admin, h)
+		registerAffiliateRoutes(admin, h, settingService)
 
 		// 操作审计日志
 		registerAuditLogRoutes(admin, h, stepUpAuth)
@@ -524,8 +530,13 @@ func registerProxyRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAuth
 	}
 }
 
-func registerRedeemCodeRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+func registerRedeemCodeRoutes(admin *gin.RouterGroup, h *handler.Handlers, settingService *service.SettingService) {
 	codes := admin.Group("/redeem-codes")
+	codes.Use(settingFeatureEnabledGuard(
+		"payment",
+		settingService,
+		func(s *service.SettingService, ctx context.Context) bool { return s.IsPaymentEnabled(ctx) },
+	))
 	{
 		codes.GET("", h.Admin.Redeem.List)
 		codes.GET("/stats", h.Admin.Redeem.GetStats)
@@ -540,8 +551,13 @@ func registerRedeemCodeRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	}
 }
 
-func registerPromoCodeRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+func registerPromoCodeRoutes(admin *gin.RouterGroup, h *handler.Handlers, settingService *service.SettingService) {
 	promoCodes := admin.Group("/promo-codes")
+	promoCodes.Use(settingFeatureEnabledGuard(
+		"promo_code",
+		settingService,
+		func(s *service.SettingService, ctx context.Context) bool { return s.IsPromoCodeEnabled(ctx) },
+	))
 	{
 		promoCodes.GET("", h.Admin.Promo.List)
 		promoCodes.GET("/:id", h.Admin.Promo.GetByID)
@@ -665,8 +681,14 @@ func registerSystemRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	}
 }
 
-func registerSubscriptionRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+func registerSubscriptionRoutes(admin *gin.RouterGroup, h *handler.Handlers, settingService *service.SettingService) {
+	guard := settingFeatureEnabledGuard(
+		"payment",
+		settingService,
+		func(s *service.SettingService, ctx context.Context) bool { return s.IsPaymentEnabled(ctx) },
+	)
 	subscriptions := admin.Group("/subscriptions")
+	subscriptions.Use(guard)
 	{
 		subscriptions.GET("", h.Admin.Subscription.List)
 		subscriptions.GET("/:id", h.Admin.Subscription.GetByID)
@@ -681,10 +703,10 @@ func registerSubscriptionRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	}
 
 	// 分组下的订阅列表
-	admin.GET("/groups/:id/subscriptions", h.Admin.Subscription.ListByGroup)
+	admin.GET("/groups/:id/subscriptions", guard, h.Admin.Subscription.ListByGroup)
 
 	// 用户下的订阅列表
-	admin.GET("/users/:id/subscriptions", h.Admin.Subscription.ListByUser)
+	admin.GET("/users/:id/subscriptions", guard, h.Admin.Subscription.ListByUser)
 }
 
 func registerUsageRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
@@ -746,8 +768,13 @@ func registerTLSFingerprintProfileRoutes(admin *gin.RouterGroup, h *handler.Hand
 	}
 }
 
-func registerPluginRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAuth middleware.StepUpAuthMiddleware) {
+func registerPluginRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAuth middleware.StepUpAuthMiddleware, settingService *service.SettingService) {
 	plugins := admin.Group("/plugins")
+	plugins.Use(settingFeatureEnabledGuard(
+		"plugin_management",
+		settingService,
+		func(s *service.SettingService, ctx context.Context) bool { return s.IsPluginManagementEnabled(ctx) },
+	))
 	{
 		plugins.GET("", h.Admin.Plugin.List)
 		plugins.GET("/:id", h.Admin.Plugin.Get)
@@ -804,8 +831,13 @@ func registerChannelMonitorRoutes(admin *gin.RouterGroup, h *handler.Handlers, s
 }
 
 // registerAffiliateRoutes 注册邀请返利的管理端路由（专属用户配置）
-func registerAffiliateRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+func registerAffiliateRoutes(admin *gin.RouterGroup, h *handler.Handlers, settingService *service.SettingService) {
 	affiliates := admin.Group("/affiliates")
+	affiliates.Use(settingFeatureEnabledGuard(
+		"affiliate",
+		settingService,
+		func(s *service.SettingService, ctx context.Context) bool { return s.IsAffiliateEnabled(ctx) },
+	))
 	{
 		affiliates.GET("/invites", h.Admin.Affiliate.ListInviteRecords)
 		affiliates.GET("/rebates", h.Admin.Affiliate.ListRebateRecords)

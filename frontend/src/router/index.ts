@@ -13,6 +13,7 @@ import { useRoutePrefetch } from '@/composables/useRoutePrefetch'
 import { getSetupStatus } from '@/api/setup'
 import { resolveCompletedSetupRedirectPath } from './setupRedirect'
 import { resolveRouteDocumentTitle } from './title'
+import { FeatureFlags, isFeatureFlagEnabled } from '@/utils/featureFlags'
 
 /**
  * Route definitions with lazy loading
@@ -56,7 +57,8 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: false,
       title: 'Register',
-      titleKey: 'auth.createAccount'
+      titleKey: 'auth.createAccount',
+      requiresFeature: 'registration'
     }
   },
   {
@@ -182,7 +184,8 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: false,
       title: 'Model Plaza',
-      titleKey: 'modelPlaza.title'
+      titleKey: 'modelPlaza.title',
+      requiresFeature: 'modelPlaza'
     }
   },
 
@@ -249,7 +252,8 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: false,
       title: 'Redeem Code',
       titleKey: 'redeem.title',
-      descriptionKey: 'redeem.description'
+      descriptionKey: 'redeem.description',
+      requiresPayment: true
     }
   },
   {
@@ -261,7 +265,8 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: false,
       title: 'Affiliate',
       titleKey: 'affiliate.title',
-      descriptionKey: 'affiliate.description'
+      descriptionKey: 'affiliate.description',
+      requiresFeature: 'affiliate'
     }
   },
   {
@@ -273,7 +278,8 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: false,
       title: 'Available Channels',
       titleKey: 'availableChannels.title',
-      descriptionKey: 'availableChannels.description'
+      descriptionKey: 'availableChannels.description',
+      requiresFeature: 'availableChannels'
     }
   },
   {
@@ -297,7 +303,8 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: false,
       title: 'My Subscriptions',
       titleKey: 'userSubscriptions.title',
-      descriptionKey: 'userSubscriptions.description'
+      descriptionKey: 'userSubscriptions.description',
+      requiresPayment: true
     }
   },
   {
@@ -346,7 +353,7 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: false,
       title: 'Payment Result',
       titleKey: 'payment.result.success',
-      requiresPayment: false
+      requiresPayment: true
     }
   },
   {
@@ -358,7 +365,7 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: false,
       title: 'Stripe Payment',
       titleKey: 'payment.stripePay',
-      requiresPayment: false
+      requiresPayment: true
     }
   },
   {
@@ -370,7 +377,7 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: false,
       title: 'Airwallex Payment',
       titleKey: 'payment.airwallexPay',
-      requiresPayment: false
+      requiresPayment: true
     }
   },
   {
@@ -381,7 +388,7 @@ const routes: RouteRecordRaw[] = [
       requiresAuth: false,
       requiresAdmin: false,
       title: 'Payment',
-      requiresPayment: false
+      requiresPayment: true
     }
   },
   {
@@ -486,7 +493,8 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: true,
       title: 'Channel Monitor',
       titleKey: 'admin.channelMonitor.title',
-      descriptionKey: 'admin.channelMonitor.description'
+      descriptionKey: 'admin.channelMonitor.description',
+      requiresFeature: 'channelMonitor'
     }
   },
   {
@@ -497,7 +505,8 @@ const routes: RouteRecordRaw[] = [
       requiresAuth: true,
       requiresAdmin: false,
       title: 'Channel Status',
-      titleKey: 'nav.channelStatus'
+      titleKey: 'nav.channelStatus',
+      requiresFeature: 'channelMonitor'
     }
   },
   {
@@ -509,7 +518,8 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: true,
       title: 'Subscription Management',
       titleKey: 'admin.subscriptions.title',
-      descriptionKey: 'admin.subscriptions.description'
+      descriptionKey: 'admin.subscriptions.description',
+      requiresPayment: true
     }
   },
   {
@@ -533,7 +543,8 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: true,
       title: 'Plugin Management',
       titleKey: 'admin.plugins.title',
-      descriptionKey: 'admin.plugins.description'
+      descriptionKey: 'admin.plugins.description',
+      requiresFeature: 'pluginManagement'
     }
   },
   {
@@ -569,7 +580,8 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: true,
       title: 'Redeem Code Management',
       titleKey: 'admin.redeem.title',
-      descriptionKey: 'admin.redeem.description'
+      descriptionKey: 'admin.redeem.description',
+      requiresPayment: true
     }
   },
   {
@@ -581,7 +593,8 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: true,
       title: 'Promo Code Management',
       titleKey: 'admin.promo.title',
-      descriptionKey: 'admin.promo.description'
+      descriptionKey: 'admin.promo.description',
+      requiresFeature: 'promoCode'
     }
   },
   {
@@ -647,7 +660,8 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: true,
       title: 'Affiliate Invite Records',
       titleKey: 'nav.affiliateInviteRecords',
-      descriptionKey: 'admin.affiliates.invitesDescription'
+      descriptionKey: 'admin.affiliates.invitesDescription',
+      requiresFeature: 'affiliate'
     }
   },
   {
@@ -659,7 +673,8 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: true,
       title: 'Affiliate Rebate Records',
       titleKey: 'nav.affiliateRebateRecords',
-      descriptionKey: 'admin.affiliates.rebatesDescription'
+      descriptionKey: 'admin.affiliates.rebatesDescription',
+      requiresFeature: 'affiliate'
     }
   },
   {
@@ -671,7 +686,8 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: true,
       title: 'Affiliate Transfer Records',
       titleKey: 'nav.affiliateTransferRecords',
-      descriptionKey: 'admin.affiliates.transfersDescription'
+      descriptionKey: 'admin.affiliates.transfersDescription',
+      requiresFeature: 'affiliate'
     }
   },
 
@@ -815,6 +831,34 @@ router.beforeEach(async (to, _from, next) => {
     }
   }
 
+  // Scope-controlled routes are opt-in. This check runs before the public-route
+  // early return so registration and payment result/callback pages cannot be
+  // opened directly while their server-side feature is closed.
+  const requiresFeature = to.meta.requiresFeature
+  if ((requiresFeature || to.meta.requiresPayment || to.meta.requiresRiskControl) && !appStore.publicSettingsLoaded) {
+    try {
+      await appStore.fetchPublicSettings()
+    } catch (error) {
+      console.warn('Failed to load public settings in route guard', error)
+    }
+  }
+
+  const featureFallback = authStore.isAuthenticated
+    ? authStore.isAdmin
+      ? '/admin/dashboard'
+      : '/dashboard'
+    : '/home'
+
+  if (requiresFeature && !isFeatureFlagEnabled(FeatureFlags[requiresFeature])) {
+    next(featureFallback)
+    return
+  }
+
+  if (to.meta.requiresPayment && !isFeatureFlagEnabled(FeatureFlags.payment)) {
+    next(featureFallback)
+    return
+  }
+
   // If route doesn't require auth, allow access
   if (!requiresAuth) {
     // If already authenticated and trying to access login/register, redirect to appropriate dashboard
@@ -831,25 +875,7 @@ router.beforeEach(async (to, _from, next) => {
     }
     // Model Plaza:公开路由但受「启用开关 + 可选强制登录」双重控制(后端同口径 fail-closed)
     if (to.path === '/model-plaza') {
-      if (!appStore.publicSettingsLoaded) {
-        try {
-          await appStore.fetchPublicSettings()
-        } catch (error) {
-          console.warn('Failed to load public settings in route guard', error)
-        }
-      }
       const plazaSettings = appStore.cachedPublicSettings
-      // 仅在设置成功加载且明确为 false 时拦截(瞬时加载失败视为未知,由后端 404 兜底)
-      if (appStore.publicSettingsLoaded && plazaSettings?.model_plaza_enabled === false) {
-        next(
-          authStore.isAuthenticated
-            ? authStore.isAdmin
-              ? '/admin/dashboard'
-              : '/dashboard'
-            : '/home'
-        )
-        return
-      }
       if (plazaSettings?.model_plaza_require_auth === true && !authStore.isAuthenticated) {
         next({ path: '/login', query: { redirect: to.fullPath } })
         return
@@ -902,30 +928,6 @@ router.beforeEach(async (to, _from, next) => {
       }
     }
   }
-
-
-  // 公共设置可能尚未加载（App.vue 的 onMounted 异步拉取晚于首次导航，且纯静态部署
-  // 无 __APP_CONFIG__ 注入）。此时 cachedPublicSettings 为空会把 payment/risk_control
-  // 误判为“未启用”而错误拦截，故这里先确保设置加载完成。
-  if ((to.meta.requiresPayment || to.meta.requiresRiskControl) && !appStore.publicSettingsLoaded) {
-    try {
-      await appStore.fetchPublicSettings()
-    } catch (error) {
-      console.warn('Failed to load public settings in route guard', error)
-    }
-  }
-
-  // Only an explicit value from successfully loaded settings can disable a route.
-  // A transient settings failure is unknown state, not a confirmed feature toggle.
-  if (
-    to.meta.requiresPayment &&
-    appStore.publicSettingsLoaded &&
-    appStore.cachedPublicSettings?.payment_enabled === false
-  ) {
-    next(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
-    return
-  }
-
   if (
     to.meta.requiresRiskControl &&
     appStore.publicSettingsLoaded &&

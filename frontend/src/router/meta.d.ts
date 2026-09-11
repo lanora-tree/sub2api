@@ -4,6 +4,7 @@
  */
 
 import 'vue-router'
+import type { RegisteredFeatureFlag } from '@/utils/featureFlags'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -48,6 +49,12 @@ declare module 'vue-router' {
      * @default false
      */
     requiresPayment?: boolean
+
+    /**
+     * Public-settings feature required for this route. Registered features are
+     * opt-in and direct navigation fails closed when settings cannot be loaded.
+     */
+    requiresFeature?: RegisteredFeatureFlag
 
     /**
      * 是否要求风控中心功能开关已启用

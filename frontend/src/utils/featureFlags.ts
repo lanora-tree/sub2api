@@ -26,8 +26,7 @@
  * ## Modes
  *
  *   - **`opt-out`** (default enabled) — menu visible when settings unloaded,
- *     hidden only when the backend explicitly sends `false`. Use for features
- *     that ship enabled by default (Channel Monitor, Payment).
+ *     hidden only when the backend explicitly sends `false`.
  *   - **`opt-in`**  (default disabled) — menu hidden when settings unloaded,
  *     visible only when the backend explicitly sends `true`. Use for features
  *     that ship disabled (Available Channels).
@@ -94,9 +93,14 @@ function defineFlag<K extends keyof PublicSettings>(
  * public-settings-driven switch; see the "Adding a new flag" checklist above.
  */
 export const FeatureFlags = {
+  registration: defineFlag({
+    key: 'registration_enabled',
+    mode: 'opt-in',
+    label: 'Registration',
+  }),
   channelMonitor: defineFlag({
     key: 'channel_monitor_enabled',
-    mode: 'opt-out',
+    mode: 'opt-in',
     label: 'Channel Monitor',
   }),
   availableChannels: defineFlag({
@@ -116,8 +120,13 @@ export const FeatureFlags = {
   }),
   payment: defineFlag({
     key: 'payment_enabled',
-    mode: 'opt-out',
+    mode: 'opt-in',
     label: 'Payment',
+  }),
+  promoCode: defineFlag({
+    key: 'promo_code_enabled',
+    mode: 'opt-in',
+    label: 'Promo Code',
   }),
   riskControl: defineFlag({
     key: 'risk_control_enabled',

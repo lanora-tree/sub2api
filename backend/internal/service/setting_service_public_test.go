@@ -4,6 +4,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
@@ -103,6 +104,7 @@ func TestSettingService_GetPublicSettings_ExposesCompactHomeEnabled(t *testing.T
 
 func TestSettingService_ChannelMonitorHideThroughputDefaultsToPrivate(t *testing.T) {
 	missing := NewSettingService(&settingPublicRepoStub{values: map[string]string{}}, &config.Config{}).GetChannelMonitorRuntime(context.Background())
+	require.False(t, missing.Enabled)
 	require.True(t, missing.HideThroughput)
 	public, err := NewSettingService(&settingPublicRepoStub{values: map[string]string{}}, &config.Config{}).GetPublicSettings(context.Background())
 	require.NoError(t, err)
@@ -114,6 +116,14 @@ func TestSettingService_ChannelMonitorHideThroughputDefaultsToPrivate(t *testing
 		}}, &config.Config{}).GetChannelMonitorRuntime(context.Background())
 		require.False(t, runtime.HideThroughput, "value=%q", value)
 	}
+}
+
+func TestSettingService_ChannelMonitorFeatureFailsClosedOnReadError(t *testing.T) {
+	runtime := NewSettingService(&settingPublicRepoStub{err: errors.New("settings unavailable")}, &config.Config{}).
+		GetChannelMonitorRuntime(context.Background())
+
+	require.False(t, runtime.Enabled)
+	require.True(t, runtime.HideThroughput)
 }
 
 func TestSettingService_ChannelMonitorShowQuotaFailsClosed(t *testing.T) {

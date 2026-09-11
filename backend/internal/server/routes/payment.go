@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"context"
+
 	"github.com/Wei-Shaw/sub2api/internal/handler"
 	"github.com/Wei-Shaw/sub2api/internal/handler/admin"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
@@ -22,12 +24,19 @@ func RegisterPaymentRoutes(
 	settingService *service.SettingService,
 	panelRateLimiter *middleware.PanelRateLimiter,
 ) {
+	paymentGuard := settingFeatureEnabledGuard(
+		"payment",
+		settingService,
+		func(s *service.SettingService, ctx context.Context) bool { return s.IsPaymentEnabled(ctx) },
+	)
+
 	// --- User-facing payment endpoints (authenticated) ---
 	authenticated := v1.Group("/payment")
 	authenticated.Use(gin.HandlerFunc(jwtAuth))
 	authenticated.Use(middleware.BackendModeUserGuard(settingService))
 	// 面板全局按用户限流
 	authenticated.Use(panelRateLimiter.Global())
+	authenticated.Use(paymentGuard)
 	{
 		authenticated.GET("/config", paymentHandler.GetPaymentConfig)
 		authenticated.GET("/checkout-info", paymentHandler.GetCheckoutInfo)
@@ -51,6 +60,7 @@ func RegisterPaymentRoutes(
 	// The legacy anonymous out_trade_no verify endpoint remains available as a
 	// persisted-state compatibility path for staggered upgrades.
 	public := v1.Group("/payment/public")
+	public.Use(paymentGuard)
 	{
 		public.POST("/orders/verify", paymentHandler.VerifyOrderPublic)
 		public.POST("/orders/resolve", paymentHandler.ResolveOrderPublicByResumeToken)
@@ -58,6 +68,7 @@ func RegisterPaymentRoutes(
 
 	// --- Webhook endpoints (no auth) ---
 	webhook := v1.Group("/payment/webhook")
+	webhook.Use(paymentGuard)
 	{
 		// EasyPay sends GET callbacks with query params
 		webhook.GET("/easypay", webhookHandler.EasyPayNotify)
@@ -74,15 +85,18 @@ func RegisterPaymentRoutes(
 	adminGroup.Use(gin.HandlerFunc(auditLog))
 	adminGroup.Use(middleware.AdminComplianceGuard(settingService))
 	{
-		// Dashboard
-		adminGroup.GET("/dashboard", adminPaymentHandler.GetDashboard)
-
-		// Config
+		// Config remains reachable so an administrator can explicitly restore payment.
 		adminGroup.GET("/config", adminPaymentHandler.GetConfig)
 		adminGroup.PUT("/config", adminPaymentHandler.UpdateConfig)
 
+		guardedAdmin := adminGroup.Group("")
+		guardedAdmin.Use(paymentGuard)
+
+		// Dashboard
+		guardedAdmin.GET("/dashboard", adminPaymentHandler.GetDashboard)
+
 		// Orders
-		adminOrders := adminGroup.Group("/orders")
+		adminOrders := guardedAdmin.Group("/orders")
 		{
 			adminOrders.GET("", adminPaymentHandler.ListOrders)
 			adminOrders.GET("/:id", adminPaymentHandler.GetOrderDetail)
@@ -93,7 +107,7 @@ func RegisterPaymentRoutes(
 		}
 
 		// Subscription Plans
-		plans := adminGroup.Group("/plans")
+		plans := guardedAdmin.Group("/plans")
 		{
 			plans.GET("", adminPaymentHandler.ListPlans)
 			plans.POST("", adminPaymentHandler.CreatePlan)
@@ -102,7 +116,7 @@ func RegisterPaymentRoutes(
 		}
 
 		// Provider Instances
-		providers := adminGroup.Group("/providers")
+		providers := guardedAdmin.Group("/providers")
 		{
 			providers.GET("", adminPaymentHandler.ListProviders)
 			providers.POST("", adminPaymentHandler.CreateProvider)

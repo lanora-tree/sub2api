@@ -53,3 +53,20 @@ describe('AppSidebar header styles', () => {
     expect(sidebarBrandBlockMatch?.[0]).not.toContain('overflow: hidden;')
   })
 })
+
+describe('AppSidebar V1 scope closure', () => {
+  it.each([
+    ["'/subscriptions'", 'flagPayment'],
+    ["'/redeem'", 'flagPayment'],
+    ["'/admin/subscriptions'", 'flagPayment'],
+    ["'/admin/redeem'", 'flagPayment'],
+    ["'/admin/promo-codes'", 'flagPromoCode'],
+    ["'/admin/plugins'", 'flagPluginManagement'],
+  ])('keeps %s behind its feature switch', (path, flag) => {
+    const itemLine = componentSource
+      .split('\n')
+      .find((line) => line.includes(`path: ${path}`))
+
+    expect(itemLine).toContain(`featureFlag: ${flag}`)
+  })
+})

@@ -2,9 +2,9 @@
 
 ## 1. 文档定位
 
-本手册是中转站的目标运行手册，同时提供已验收的 M0 上游基线启动入口。M2 定制开发已经开始，后续业务代码和数据库变更仍必须在对应 Milestone 完成并通过测试后使用。
+本手册是中转站的目标运行手册，同时提供已验收的 M0 上游基线和 M2 范围收口版本启动入口。M2 已完成并通过全量测试、本地 migration 与 HTTP 黑盒验收；后续业务代码和数据库变更仍必须在对应 Milestone 完成并通过测试后使用。
 
-当前规划版本为 `0.1.1-planning`（2026-09-06）。2026-09-12 已完成固定提交镜像、全栈健康、测试对象、模拟 Gateway、Streaming 首包和用量落库，完整证据见 `progress.md`。
+当前规划版本为 `0.1.1-planning`（2026-09-06）。2026-09-12 已完成固定提交基线以及 M2 的三层功能关闭守卫；完整运行与测试证据见 `progress.md`。
 
 中转站面向约 10 到 50 名课题组成员和熟人用户，在 Sub2API 上提供统一的 AI API Gateway。V1 为每位用户提供独立 API Key、模型权限、CNY 预付余额、实际用量账单和调用元数据，后端接入 Codex Subscription、OpenAI Official API 与 DeepSeek Official API 三个相互隔离的 Provider。
 
@@ -118,20 +118,44 @@ make build
 
 把工具版本、测试耗时、通过数、失败数和失败日志位置写入 `progress.md`。不要在已有失败未归因时开始 M2。
 
-## 4. 日常启动与停止
+### 3.6 M2 范围收口版本
 
-在 `deploy` 目录执行：
+在仓库 `deploy` 目录使用 M2 override 构建并启动：
 
 ```bash
-docker compose -f docker-compose.local.yml up -d
-docker compose -f docker-compose.local.yml ps
-docker compose -f docker-compose.local.yml logs -f sub2api
+docker compose --env-file .env -f docker-compose.local.yml -f docker-compose.m2.yml config
+docker compose --env-file .env -f docker-compose.local.yml -f docker-compose.m2.yml build sub2api
+docker compose --env-file .env -f docker-compose.local.yml -f docker-compose.m2.yml up -d
+docker compose --env-file .env -f docker-compose.local.yml -f docker-compose.m2.yml ps
+curl -fsS http://127.0.0.1:8080/health
+```
+
+首次从 M0 升级会应用 `239_v1_scope_defaults.sql`。只读核对 migration 和开关，禁止在核对命令或日志中输出 Secret：
+
+```bash
+docker compose --env-file .env -f docker-compose.local.yml -f docker-compose.m2.yml exec -T postgres \
+  psql -U sub2api -d sub2api \
+  -c "SELECT filename, applied_at FROM schema_migrations WHERE filename = '239_v1_scope_defaults.sql';"
+
+curl -fsS http://127.0.0.1:8080/api/v1/settings/public
+```
+
+范围外能力必须只有管理员显式打开开关后才可恢复。支付配置 Admin GET/PUT 保留为恢复入口；支付订单、套餐、Provider、公开查询和 Webhook 在总开关关闭时仍返回功能关闭。
+
+## 4. 日常启动与停止
+
+当前 M2 开发栈在 `deploy` 目录执行：
+
+```bash
+docker compose --env-file .env -f docker-compose.local.yml -f docker-compose.m2.yml up -d
+docker compose --env-file .env -f docker-compose.local.yml -f docker-compose.m2.yml ps
+docker compose --env-file .env -f docker-compose.local.yml -f docker-compose.m2.yml logs -f sub2api
 ```
 
 安全停止应用栈：
 
 ```bash
-docker compose -f docker-compose.local.yml down
+docker compose --env-file .env -f docker-compose.local.yml -f docker-compose.m2.yml down
 ```
 
 不要在生产运行 `down -v`，也不要直接删除 `data`、`postgres_data` 或 `redis_data`。

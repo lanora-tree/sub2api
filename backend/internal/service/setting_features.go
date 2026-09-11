@@ -56,9 +56,9 @@ func (s *SettingService) GetRegistrationEmailSuffixWhitelist(ctx context.Context
 func (s *SettingService) IsPromoCodeEnabled(ctx context.Context) bool {
 	value, err := s.settingRepo.GetValue(ctx, SettingKeyPromoCodeEnabled)
 	if err != nil {
-		return true // 默认启用
+		return false // 安全默认：缺失或读取失败时关闭
 	}
-	return value != "false"
+	return value == "true"
 }
 
 // IsInvitationCodeEnabled 检查是否启用邀请码注册功能
@@ -84,6 +84,24 @@ func (s *SettingService) IsAffiliateEnabled(ctx context.Context) bool {
 	value, err := s.settingRepo.GetValue(ctx, SettingKeyAffiliateEnabled)
 	if err != nil {
 		return false // 默认关闭
+	}
+	return value == "true"
+}
+
+// IsPaymentEnabled 检查自助支付及其商业自助入口是否启用。
+func (s *SettingService) IsPaymentEnabled(ctx context.Context) bool {
+	value, err := s.settingRepo.GetValue(ctx, SettingPaymentEnabled)
+	if err != nil {
+		return false
+	}
+	return value == "true"
+}
+
+// IsPluginManagementEnabled 检查本地插件管理与插件 UI 是否启用。
+func (s *SettingService) IsPluginManagementEnabled(ctx context.Context) bool {
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyPluginManagementEnabled)
+	if err != nil {
+		return false
 	}
 	return value == "true"
 }

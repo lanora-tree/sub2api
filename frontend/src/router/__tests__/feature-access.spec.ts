@@ -23,8 +23,15 @@ const appStore = vi.hoisted(() => ({
   backendModeEnabled: false,
   publicSettingsLoaded: false,
   cachedPublicSettings: null as null | {
+    registration_enabled?: boolean
     payment_enabled?: boolean
     risk_control_enabled?: boolean
+    available_channels_enabled?: boolean
+    model_plaza_enabled?: boolean
+    plugin_management_enabled?: boolean
+    affiliate_enabled?: boolean
+    promo_code_enabled?: boolean
+    channel_monitor_enabled?: boolean
     custom_menu_items?: []
   },
   fetchPublicSettings: vi.fn(),
@@ -139,19 +146,26 @@ describe('feature route guard', () => {
     expect(next).toHaveBeenCalledWith()
   })
 
-  it.each([
-    ['payment', { requiresPayment: true }, '/purchase'],
-    ['risk control', { requiresRiskControl: true }, '/admin/risk-control'],
-  ])('does not treat a failed %s settings load as explicitly disabled', async (_name, meta, path) => {
-    authStore.isAdmin = meta.requiresRiskControl === true
+  it('keeps the legacy risk-control route tolerant of a failed settings load', async () => {
+    authStore.isAdmin = true
     appStore.fetchPublicSettings.mockResolvedValue(null)
 
-    const { navigation, next } = runGuard(meta, path)
+    const { navigation, next } = runGuard({ requiresRiskControl: true }, '/admin/risk-control')
     await navigation
 
     expect(appStore.publicSettingsLoaded).toBe(false)
     expect(next).toHaveBeenCalledOnce()
     expect(next).toHaveBeenCalledWith()
+  })
+
+  it('fails closed when payment settings cannot be loaded', async () => {
+    appStore.fetchPublicSettings.mockResolvedValue(null)
+
+    const { navigation, next } = runGuard({ requiresPayment: true }, '/purchase')
+    await navigation
+
+    expect(next).toHaveBeenCalledOnce()
+    expect(next).toHaveBeenCalledWith('/dashboard')
   })
 
   it.each([
@@ -173,5 +187,40 @@ describe('feature route guard', () => {
     expect(appStore.fetchPublicSettings).not.toHaveBeenCalled()
     expect(next).toHaveBeenCalledOnce()
     expect(next).toHaveBeenCalledWith(target)
+  })
+
+  it.each([
+    ['registration', 'registration', 'registration_enabled', '/register'],
+    ['available channels', 'availableChannels', 'available_channels_enabled', '/available-channels'],
+    ['channel monitor', 'channelMonitor', 'channel_monitor_enabled', '/monitor'],
+    ['plugins', 'pluginManagement', 'plugin_management_enabled', '/admin/plugins'],
+    ['affiliate', 'affiliate', 'affiliate_enabled', '/affiliate'],
+    ['promo codes', 'promoCode', 'promo_code_enabled', '/admin/promo-codes'],
+  ])('fails closed for the %s route and allows it only when explicitly enabled', async (_name, feature, key, path) => {
+    appStore.cachedPublicSettings = { [key]: false }
+    appStore.publicSettingsLoaded = true
+
+    let result = runGuard({ requiresFeature: feature }, path)
+    await result.navigation
+    expect(result.next).toHaveBeenCalledWith('/dashboard')
+
+    appStore.cachedPublicSettings = { [key]: true }
+    result = runGuard({ requiresFeature: feature }, path)
+    await result.navigation
+    expect(result.next).toHaveBeenCalledWith()
+  })
+
+  it('blocks a public payment result route before the public-route early return', async () => {
+    authStore.isAuthenticated = false
+    appStore.cachedPublicSettings = { payment_enabled: false }
+    appStore.publicSettingsLoaded = true
+
+    const { navigation, next } = runGuard(
+      { requiresAuth: false, requiresPayment: true },
+      '/payment/result'
+    )
+    await navigation
+
+    expect(next).toHaveBeenCalledWith('/home')
   })
 })
