@@ -5,10 +5,13 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/migrations"
+	"github.com/lib/pq"
 	"github.com/stretchr/testify/require"
 )
 
@@ -149,6 +152,33 @@ WHERE ns.nspname = 'public'
 	require.NoError(t, tx.QueryRowContext(context.Background(), "SELECT to_regclass('public.security_secrets')").Scan(&securitySecretsRegclass))
 	require.True(t, securitySecretsRegclass.Valid, "expected security_secrets table to exist")
 
+	// wallet_transactions: immutable CNY NUMERIC(20,8) ledger foundation.
+	var walletTransactionsRegclass sql.NullString
+	require.NoError(t, tx.QueryRowContext(context.Background(), "SELECT to_regclass('public.wallet_transactions')").Scan(&walletTransactionsRegclass))
+	require.True(t, walletTransactionsRegclass.Valid, "expected wallet_transactions table to exist")
+	requireNumericColumn(t, tx, "wallet_transactions", "amount", 20, 8, false)
+	requireNumericColumn(t, tx, "wallet_transactions", "balance_before", 20, 8, false)
+	requireNumericColumn(t, tx, "wallet_transactions", "balance_after", 20, 8, false)
+	requireColumn(t, tx, "wallet_transactions", "currency", "character", 3, false)
+	requireIndex(t, tx, "wallet_transactions", "idx_wallet_transactions_user_created")
+	requireIndex(t, tx, "wallet_transactions", "idx_wallet_transactions_reference")
+	requireConstraintDefinitionContains(t, tx, "wallet_transactions", "wallet_transactions_currency_check", "currency", "'CNY'")
+	requireConstraintDefinitionContains(t, tx, "wallet_transactions", "wallet_transactions_amount_sign_check", "recharge", "refund", "usage", "amount")
+	requireConstraintDefinitionContains(t, tx, "wallet_transactions", "wallet_transactions_balance_equation_check", "balance_after", "balance_before", "amount")
+	requireConstraintDefinitionContains(t, tx, "wallet_transactions", "wallet_transactions_required_text_check", "reference_type", "reference_id", "idempotency_key", "source")
+	requireConstraintDefinitionContains(t, tx, "wallet_transactions", "wallet_transactions_fingerprint_check", "request_fingerprint")
+	var immutableTrigger bool
+	require.NoError(t, tx.QueryRowContext(context.Background(), `
+SELECT EXISTS (
+	SELECT 1
+	FROM pg_trigger
+	WHERE tgrelid = 'public.wallet_transactions'::regclass
+	  AND tgname = 'trg_wallet_transactions_immutable'
+	  AND NOT tgisinternal
+)
+`).Scan(&immutableTrigger))
+	require.True(t, immutableTrigger, "expected immutable wallet transaction trigger")
+
 	// scheduler_outbox pending dedup support
 	requireColumn(t, tx, "scheduler_outbox", "dedup_key", "text", 0, true)
 	requireIndex(t, tx, "scheduler_outbox", "idx_scheduler_outbox_pending_dedup_key")
@@ -211,6 +241,40 @@ func TestMigrationsRunner_AuthIdentityAndPaymentSchemaStayAligned(t *testing.T) 
 	requireIndex(t, tx, "payment_orders", "paymentorder_out_trade_no")
 	requirePartialUniqueIndexDefinition(t, tx, "payment_orders", "paymentorder_out_trade_no", "out_trade_no", "WHERE")
 	requireIndexAbsent(t, tx, "payment_orders", "paymentorder_out_trade_no_unique")
+}
+
+func TestMigrationsRunner_WalletOpeningBalanceAndImmutability(t *testing.T) {
+	tx := testTx(t)
+	ctx := context.Background()
+	var userID int64
+	require.NoError(t, tx.QueryRowContext(ctx, `
+INSERT INTO users (email, password_hash, role, balance)
+VALUES ('wallet-migration@example.test', 'not-a-real-hash', 'user', 12.34)
+RETURNING id
+`).Scan(&userID))
+
+	migrationSQL, err := migrations.FS.ReadFile("240_cny_wallet_transactions.sql")
+	require.NoError(t, err)
+	_, err = tx.ExecContext(ctx, string(migrationSQL))
+	require.NoError(t, err)
+
+	var amount, before, after, currency, fingerprint string
+	require.NoError(t, tx.QueryRowContext(ctx, `
+SELECT amount::text, balance_before::text, balance_after::text, currency, request_fingerprint
+FROM wallet_transactions
+WHERE idempotency_key = $1
+`, "m6-opening:user:"+fmt.Sprint(userID)).Scan(&amount, &before, &after, &currency, &fingerprint))
+	require.Equal(t, "12.34000000", amount)
+	require.Equal(t, "0.00000000", before)
+	require.Equal(t, "12.34000000", after)
+	require.Equal(t, "CNY", currency)
+	require.Len(t, fingerprint, 64)
+
+	_, err = tx.ExecContext(ctx, `UPDATE wallet_transactions SET note = 'rewritten' WHERE idempotency_key = $1`, "m6-opening:user:"+fmt.Sprint(userID))
+	require.Error(t, err)
+	var pgErr *pq.Error
+	require.ErrorAs(t, err, &pgErr)
+	require.Equal(t, pq.ErrorCode("55000"), pgErr.Code)
 }
 
 func requireIndex(t *testing.T, tx *sql.Tx, table, index string) {
@@ -373,5 +437,32 @@ WHERE table_schema = 'public'
 		require.Equal(t, "YES", row.Nullable, "nullable mismatch for %s.%s", table, column)
 	} else {
 		require.Equal(t, "NO", row.Nullable, "nullable mismatch for %s.%s", table, column)
+	}
+}
+
+func requireNumericColumn(t *testing.T, tx *sql.Tx, table, column string, precision, scale int64, nullable bool) {
+	t.Helper()
+
+	var actual struct {
+		DataType  string
+		Precision sql.NullInt64
+		Scale     sql.NullInt64
+		Nullable  string
+	}
+	err := tx.QueryRowContext(context.Background(), `
+SELECT data_type, numeric_precision, numeric_scale, is_nullable
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = $1
+  AND column_name = $2
+`, table, column).Scan(&actual.DataType, &actual.Precision, &actual.Scale, &actual.Nullable)
+	require.NoError(t, err, "query numeric column for %s.%s", table, column)
+	require.Equal(t, "numeric", actual.DataType)
+	require.Equal(t, precision, actual.Precision.Int64)
+	require.Equal(t, scale, actual.Scale.Int64)
+	if nullable {
+		require.Equal(t, "YES", actual.Nullable)
+	} else {
+		require.Equal(t, "NO", actual.Nullable)
 	}
 }

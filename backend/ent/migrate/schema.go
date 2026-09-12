@@ -2085,6 +2085,57 @@ var (
 			},
 		},
 	}
+	// WalletTransactionsColumns holds the columns for the "wallet_transactions" table.
+	WalletTransactionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "type", Type: field.TypeEnum, Enums: []string{"recharge", "usage", "refund", "adjustment"}},
+		{Name: "amount", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "numeric(20,8)"}},
+		{Name: "currency", Type: field.TypeString, Size: 3, Default: "CNY"},
+		{Name: "balance_before", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "numeric(20,8)"}},
+		{Name: "balance_after", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "numeric(20,8)"}},
+		{Name: "reference_type", Type: field.TypeString, Size: 32},
+		{Name: "reference_id", Type: field.TypeString, Size: 128},
+		{Name: "idempotency_key", Type: field.TypeString, Unique: true, Size: 160},
+		{Name: "request_fingerprint", Type: field.TypeString, Size: 64},
+		{Name: "source", Type: field.TypeString, Size: 64},
+		{Name: "note", Type: field.TypeString, Size: 500, Default: ""},
+		{Name: "metadata", Type: field.TypeJSON},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "user_id", Type: field.TypeInt64},
+		{Name: "operator_id", Type: field.TypeInt64, Nullable: true},
+	}
+	// WalletTransactionsTable holds the schema information for the "wallet_transactions" table.
+	WalletTransactionsTable = &schema.Table{
+		Name:       "wallet_transactions",
+		Columns:    WalletTransactionsColumns,
+		PrimaryKey: []*schema.Column{WalletTransactionsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "wallet_transactions_users_wallet_transactions",
+				Columns:    []*schema.Column{WalletTransactionsColumns[14]},
+				RefColumns: []*schema.Column{UsersColumns[0]},
+				OnDelete:   schema.Restrict,
+			},
+			{
+				Symbol:     "wallet_transactions_users_operated_wallet_transactions",
+				Columns:    []*schema.Column{WalletTransactionsColumns[15]},
+				RefColumns: []*schema.Column{UsersColumns[0]},
+				OnDelete:   schema.Restrict,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "wallettransaction_user_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{WalletTransactionsColumns[14], WalletTransactionsColumns[13]},
+			},
+			{
+				Name:    "wallettransaction_reference_type_reference_id",
+				Unique:  false,
+				Columns: []*schema.Column{WalletTransactionsColumns[6], WalletTransactionsColumns[7]},
+			},
+		},
+	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
 		APIKeysTable,
@@ -2126,6 +2177,7 @@ var (
 		UserAttributeValuesTable,
 		UserPlatformQuotasTable,
 		UserSubscriptionsTable,
+		WalletTransactionsTable,
 	}
 )
 
@@ -2282,5 +2334,10 @@ func init() {
 	UserSubscriptionsTable.ForeignKeys[2].RefTable = UsersTable
 	UserSubscriptionsTable.Annotation = &entsql.Annotation{
 		Table: "user_subscriptions",
+	}
+	WalletTransactionsTable.ForeignKeys[0].RefTable = UsersTable
+	WalletTransactionsTable.ForeignKeys[1].RefTable = UsersTable
+	WalletTransactionsTable.Annotation = &entsql.Annotation{
+		Table: "wallet_transactions",
 	}
 }

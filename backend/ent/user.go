@@ -101,11 +101,15 @@ type UserEdges struct {
 	PendingAuthSessions []*PendingAuthSession `json:"pending_auth_sessions,omitempty"`
 	// PlatformQuotas holds the value of the platform_quotas edge.
 	PlatformQuotas []*UserPlatformQuota `json:"platform_quotas,omitempty"`
+	// WalletTransactions holds the value of the wallet_transactions edge.
+	WalletTransactions []*WalletTransaction `json:"wallet_transactions,omitempty"`
+	// OperatedWalletTransactions holds the value of the operated_wallet_transactions edge.
+	OperatedWalletTransactions []*WalletTransaction `json:"operated_wallet_transactions,omitempty"`
 	// UserAllowedGroups holds the value of the user_allowed_groups edge.
 	UserAllowedGroups []*UserAllowedGroup `json:"user_allowed_groups,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [14]bool
+	loadedTypes [16]bool
 }
 
 // APIKeysOrErr returns the APIKeys value or an error if the edge
@@ -225,10 +229,28 @@ func (e UserEdges) PlatformQuotasOrErr() ([]*UserPlatformQuota, error) {
 	return nil, &NotLoadedError{edge: "platform_quotas"}
 }
 
+// WalletTransactionsOrErr returns the WalletTransactions value or an error if the edge
+// was not loaded in eager-loading.
+func (e UserEdges) WalletTransactionsOrErr() ([]*WalletTransaction, error) {
+	if e.loadedTypes[13] {
+		return e.WalletTransactions, nil
+	}
+	return nil, &NotLoadedError{edge: "wallet_transactions"}
+}
+
+// OperatedWalletTransactionsOrErr returns the OperatedWalletTransactions value or an error if the edge
+// was not loaded in eager-loading.
+func (e UserEdges) OperatedWalletTransactionsOrErr() ([]*WalletTransaction, error) {
+	if e.loadedTypes[14] {
+		return e.OperatedWalletTransactions, nil
+	}
+	return nil, &NotLoadedError{edge: "operated_wallet_transactions"}
+}
+
 // UserAllowedGroupsOrErr returns the UserAllowedGroups value or an error if the edge
 // was not loaded in eager-loading.
 func (e UserEdges) UserAllowedGroupsOrErr() ([]*UserAllowedGroup, error) {
-	if e.loadedTypes[13] {
+	if e.loadedTypes[15] {
 		return e.UserAllowedGroups, nil
 	}
 	return nil, &NotLoadedError{edge: "user_allowed_groups"}
@@ -502,6 +524,16 @@ func (_m *User) QueryPendingAuthSessions() *PendingAuthSessionQuery {
 // QueryPlatformQuotas queries the "platform_quotas" edge of the User entity.
 func (_m *User) QueryPlatformQuotas() *UserPlatformQuotaQuery {
 	return NewUserClient(_m.config).QueryPlatformQuotas(_m)
+}
+
+// QueryWalletTransactions queries the "wallet_transactions" edge of the User entity.
+func (_m *User) QueryWalletTransactions() *WalletTransactionQuery {
+	return NewUserClient(_m.config).QueryWalletTransactions(_m)
+}
+
+// QueryOperatedWalletTransactions queries the "operated_wallet_transactions" edge of the User entity.
+func (_m *User) QueryOperatedWalletTransactions() *WalletTransactionQuery {
+	return NewUserClient(_m.config).QueryOperatedWalletTransactions(_m)
 }
 
 // QueryUserAllowedGroups queries the "user_allowed_groups" edge of the User entity.

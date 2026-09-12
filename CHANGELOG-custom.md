@@ -42,6 +42,18 @@
 
 应用代码可回退到 M0 固定镜像；migration 不回滚、不删除。若需恢复单项能力，由管理员在确认风险后显式开启对应开关，并重新执行该能力的安全与 API 验收。
 
+### M6.1 completed
+
+* 产品负责人确认 CNY 为唯一权威记账币种；M0 无价值测试余额按数值 1:1 生成 opening adjustment，不做汇率换算。
+* 新增 forward-only migration `240_cny_wallet_transactions.sql`：`NUMERIC(20,8)` 金额、CNY/符号/余额等式/指纹约束、全局幂等键、查询索引和拒绝 UPDATE/DELETE 的数据库 trigger。
+* 新增 Decimal 钱包 domain 与 repository：规范化 SHA-256 fingerprint、事务级 advisory lock、用户行锁、余额和流水原子提交、负余额策略和精确对账。
+* 新增 Ent WalletTransaction schema/生成代码，以及幂等、回滚、Unicode、舍入零 usage、并发和对账测试。
+* 定向测试、真实 PostgreSQL 18 integration、本地升级库 migration/对账、完整 Linux Backend `go test ./...`、M6.1 镜像启动与健康检查均通过。M6.1 已完成，M6 继续进入管理员钱包接口接入。
+
+### M6.1 recovery
+
+应用可回退至 M2 代码继续读取 `users.balance`。Migration forward-only：不得删除或改写已生成的开账/业务流水；如测试数据库需要完全恢复，使用升级前备份重建。Admin 与 Gateway 旧余额写路径在本子任务尚未切换。
+
 ### M0 completed
 
 * 在 `codex/m0-baseline` 固定上游提交 `b1748c4ea99ce2120401a269142aa071e18a84da`。

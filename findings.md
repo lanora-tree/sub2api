@@ -14,7 +14,7 @@ Sub2API 有条件适合作为本项目底座。它对 Codex、OpenAI Compatible 
 
 1. 上游管理端在任何管理写操作前强制管理员本人确认 `v2026.06.10` 合规声明。管理员已在 UI 完成确认，数据库记录版本与用户；自动化没有代签或绕过门禁。
 2. 正式 Fork `https://github.com/lanora-tree/sub2api` 已创建；本地 `origin` 与 `upstream` 已按项目规则配置，原 Fork 阻塞关闭。
-3. `upstream/main` 当前为 `4726bdd08b6201d426a80529b79be123a4008d20`，已领先审计提交 349 个提交。M2 继续从已验收基线开发；上游同步必须在专用分支审阅，不能静默改变 M0 审计基线。
+3. `upstream/main` 于 2026-09-12 开始 M6 前重新抓取，仍为 `4726bdd08b6201d426a80529b79be123a4008d20`，已领先审计提交 349 个提交。M6 继续从已验收 M2 基线开发；上游同步必须在专用分支审阅，不能静默改变审计基线。
 4. Windows CRLF 检出会使部分 POSIX 精确行匹配部署测试误报。实际配置语义未失败；临时 LF 副本全部通过。项目已补充 `.gitattributes`，保证后续检出一致。
 5. M0 使用本地临时 OpenAI Compatible mock 验证 `gpt-5.4` 模型列表、非流式与 Streaming。两条请求均落入 `usage_logs` 并按上游原始 USD 语义扣费；模拟账号随后设为 inactive，临时容器和脚本已移除。
 
@@ -27,6 +27,16 @@ Sub2API 有条件适合作为本项目底座。它对 Codex、OpenAI Compatible 
 3. 支付配置的 Admin GET/PUT 有意保留，以便管理员受控恢复；订单、套餐、Provider、公开查询和 Webhook 仍受支付总开关保护。
 4. `239_v1_scope_defaults.sql` 基于当前上游最大 migration 编号 238 分配。上游同步仍须先检查文件名和 checksum 冲突。
 5. M2 不删除功能源码，也不修改 Admin 创建 User、密码登录或 Gateway 主链路；M0 的运行证据与 M2 全量回归共同覆盖保留能力。
+
+## M6 已确认决策
+
+2026-09-12 产品负责人确认 CNY 为全站唯一权威记账币种。当前本地数据库只含 M0 无价值测试余额，因此 M6.1 可按数值 1:1 写入 CNY opening adjustment，不推导或使用汇率；未来若导入真实 USD 存量，必须另行审批汇率、基准时间与逐用户对账结果。
+
+M6.1 代码审查确认：极小 usage 舍入到 `0.00000000` 时仍需写审计流水，因此 usage 允许零或负数；recharge/refund 只允许正数，普通 adjustment 必须非零，migration 专用 opening adjustment 可以为零。`users.balance` 与流水由同一事务、用户行锁和幂等 advisory lock 保护。
+
+Windows Docker Desktop 4.68.0 的 AF_UNIX 套接字重解析点故障已于 2026-09-13 恢复：完整重启后，首次启动仍读取旧 `Docker\\run\\dockerInference`，在 Docker 进程退出后把精确 `Docker\\run` 目录移动为 `run.stale-after-reboot-20260912-221448`，再次启动即恢复 Linux Engine。未执行 factory reset，镜像、容器、卷和 `docker_data.vhdx` 未删除或移动；运行目录备份暂保留用于诊断。
+
+M6.1 最终验证结果：真实 PostgreSQL 18 上的 migration、opening、不可变 trigger、并发更新、并发幂等重放、失败回滚和对账测试全部通过；本地升级库 2 个用户对应 2 条 opening 流水，差异用户数为 0。Linux Go 1.27 执行 `go test ./... -count=1` 全部通过，说明先前 5 个 Windows 失败属于平台抖动而非当前改动。
 
 ## 可以直接复用
 
@@ -77,7 +87,7 @@ M0 已完成。宿主机未安装 Go 1.27，但固定的 Go builder 容器已成
 
 1. 是否拥有 Codex Subscription 多用户使用所需的上游授权，是否允许收费或成本分摊。
 2. 如何解释和处理 Sub2API LGPL 3.0 与 README_CN“无商业授权”声明的关系。
-3. 是否确认 CNY 为唯一权威记账币种，现有或未来 USD 数据如何迁移。
+3. CNY 已确认为唯一权威记账币种；未来若出现真实 USD 存量，其迁移汇率、时点和逐用户清单仍需人工批准。
 4. DeepSeek 对外继续使用 `deepseek-chat`、`deepseek-reasoner` 逻辑别名，还是直接发布 V4 模型名。
 5. OpenAI Official 和 Codex V1 具体开放模型清单与初始价格。
 6. Admin 是否只允许 VPN 或固定 IP 访问。

@@ -25,6 +25,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/userattributevalue"
 	"github.com/Wei-Shaw/sub2api/ent/userplatformquota"
 	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
+	"github.com/Wei-Shaw/sub2api/ent/wallettransaction"
 )
 
 // UserUpdate is the builder for updating User entities.
@@ -641,6 +642,36 @@ func (_u *UserUpdate) AddPlatformQuotas(v ...*UserPlatformQuota) *UserUpdate {
 	return _u.AddPlatformQuotaIDs(ids...)
 }
 
+// AddWalletTransactionIDs adds the "wallet_transactions" edge to the WalletTransaction entity by IDs.
+func (_u *UserUpdate) AddWalletTransactionIDs(ids ...int64) *UserUpdate {
+	_u.mutation.AddWalletTransactionIDs(ids...)
+	return _u
+}
+
+// AddWalletTransactions adds the "wallet_transactions" edges to the WalletTransaction entity.
+func (_u *UserUpdate) AddWalletTransactions(v ...*WalletTransaction) *UserUpdate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddWalletTransactionIDs(ids...)
+}
+
+// AddOperatedWalletTransactionIDs adds the "operated_wallet_transactions" edge to the WalletTransaction entity by IDs.
+func (_u *UserUpdate) AddOperatedWalletTransactionIDs(ids ...int64) *UserUpdate {
+	_u.mutation.AddOperatedWalletTransactionIDs(ids...)
+	return _u
+}
+
+// AddOperatedWalletTransactions adds the "operated_wallet_transactions" edges to the WalletTransaction entity.
+func (_u *UserUpdate) AddOperatedWalletTransactions(v ...*WalletTransaction) *UserUpdate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddOperatedWalletTransactionIDs(ids...)
+}
+
 // Mutation returns the UserMutation object of the builder.
 func (_u *UserUpdate) Mutation() *UserMutation {
 	return _u.mutation
@@ -917,6 +948,48 @@ func (_u *UserUpdate) RemovePlatformQuotas(v ...*UserPlatformQuota) *UserUpdate 
 		ids[i] = v[i].ID
 	}
 	return _u.RemovePlatformQuotaIDs(ids...)
+}
+
+// ClearWalletTransactions clears all "wallet_transactions" edges to the WalletTransaction entity.
+func (_u *UserUpdate) ClearWalletTransactions() *UserUpdate {
+	_u.mutation.ClearWalletTransactions()
+	return _u
+}
+
+// RemoveWalletTransactionIDs removes the "wallet_transactions" edge to WalletTransaction entities by IDs.
+func (_u *UserUpdate) RemoveWalletTransactionIDs(ids ...int64) *UserUpdate {
+	_u.mutation.RemoveWalletTransactionIDs(ids...)
+	return _u
+}
+
+// RemoveWalletTransactions removes "wallet_transactions" edges to WalletTransaction entities.
+func (_u *UserUpdate) RemoveWalletTransactions(v ...*WalletTransaction) *UserUpdate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveWalletTransactionIDs(ids...)
+}
+
+// ClearOperatedWalletTransactions clears all "operated_wallet_transactions" edges to the WalletTransaction entity.
+func (_u *UserUpdate) ClearOperatedWalletTransactions() *UserUpdate {
+	_u.mutation.ClearOperatedWalletTransactions()
+	return _u
+}
+
+// RemoveOperatedWalletTransactionIDs removes the "operated_wallet_transactions" edge to WalletTransaction entities by IDs.
+func (_u *UserUpdate) RemoveOperatedWalletTransactionIDs(ids ...int64) *UserUpdate {
+	_u.mutation.RemoveOperatedWalletTransactionIDs(ids...)
+	return _u
+}
+
+// RemoveOperatedWalletTransactions removes "operated_wallet_transactions" edges to WalletTransaction entities.
+func (_u *UserUpdate) RemoveOperatedWalletTransactions(v ...*WalletTransaction) *UserUpdate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveOperatedWalletTransactionIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -1713,6 +1786,96 @@ func (_u *UserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if _u.mutation.WalletTransactionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.WalletTransactionsTable,
+			Columns: []string{user.WalletTransactionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(wallettransaction.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedWalletTransactionsIDs(); len(nodes) > 0 && !_u.mutation.WalletTransactionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.WalletTransactionsTable,
+			Columns: []string{user.WalletTransactionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(wallettransaction.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.WalletTransactionsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.WalletTransactionsTable,
+			Columns: []string{user.WalletTransactionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(wallettransaction.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.OperatedWalletTransactionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.OperatedWalletTransactionsTable,
+			Columns: []string{user.OperatedWalletTransactionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(wallettransaction.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedOperatedWalletTransactionsIDs(); len(nodes) > 0 && !_u.mutation.OperatedWalletTransactionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.OperatedWalletTransactionsTable,
+			Columns: []string{user.OperatedWalletTransactionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(wallettransaction.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.OperatedWalletTransactionsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.OperatedWalletTransactionsTable,
+			Columns: []string{user.OperatedWalletTransactionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(wallettransaction.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{user.Label}
@@ -2334,6 +2497,36 @@ func (_u *UserUpdateOne) AddPlatformQuotas(v ...*UserPlatformQuota) *UserUpdateO
 	return _u.AddPlatformQuotaIDs(ids...)
 }
 
+// AddWalletTransactionIDs adds the "wallet_transactions" edge to the WalletTransaction entity by IDs.
+func (_u *UserUpdateOne) AddWalletTransactionIDs(ids ...int64) *UserUpdateOne {
+	_u.mutation.AddWalletTransactionIDs(ids...)
+	return _u
+}
+
+// AddWalletTransactions adds the "wallet_transactions" edges to the WalletTransaction entity.
+func (_u *UserUpdateOne) AddWalletTransactions(v ...*WalletTransaction) *UserUpdateOne {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddWalletTransactionIDs(ids...)
+}
+
+// AddOperatedWalletTransactionIDs adds the "operated_wallet_transactions" edge to the WalletTransaction entity by IDs.
+func (_u *UserUpdateOne) AddOperatedWalletTransactionIDs(ids ...int64) *UserUpdateOne {
+	_u.mutation.AddOperatedWalletTransactionIDs(ids...)
+	return _u
+}
+
+// AddOperatedWalletTransactions adds the "operated_wallet_transactions" edges to the WalletTransaction entity.
+func (_u *UserUpdateOne) AddOperatedWalletTransactions(v ...*WalletTransaction) *UserUpdateOne {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddOperatedWalletTransactionIDs(ids...)
+}
+
 // Mutation returns the UserMutation object of the builder.
 func (_u *UserUpdateOne) Mutation() *UserMutation {
 	return _u.mutation
@@ -2610,6 +2803,48 @@ func (_u *UserUpdateOne) RemovePlatformQuotas(v ...*UserPlatformQuota) *UserUpda
 		ids[i] = v[i].ID
 	}
 	return _u.RemovePlatformQuotaIDs(ids...)
+}
+
+// ClearWalletTransactions clears all "wallet_transactions" edges to the WalletTransaction entity.
+func (_u *UserUpdateOne) ClearWalletTransactions() *UserUpdateOne {
+	_u.mutation.ClearWalletTransactions()
+	return _u
+}
+
+// RemoveWalletTransactionIDs removes the "wallet_transactions" edge to WalletTransaction entities by IDs.
+func (_u *UserUpdateOne) RemoveWalletTransactionIDs(ids ...int64) *UserUpdateOne {
+	_u.mutation.RemoveWalletTransactionIDs(ids...)
+	return _u
+}
+
+// RemoveWalletTransactions removes "wallet_transactions" edges to WalletTransaction entities.
+func (_u *UserUpdateOne) RemoveWalletTransactions(v ...*WalletTransaction) *UserUpdateOne {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveWalletTransactionIDs(ids...)
+}
+
+// ClearOperatedWalletTransactions clears all "operated_wallet_transactions" edges to the WalletTransaction entity.
+func (_u *UserUpdateOne) ClearOperatedWalletTransactions() *UserUpdateOne {
+	_u.mutation.ClearOperatedWalletTransactions()
+	return _u
+}
+
+// RemoveOperatedWalletTransactionIDs removes the "operated_wallet_transactions" edge to WalletTransaction entities by IDs.
+func (_u *UserUpdateOne) RemoveOperatedWalletTransactionIDs(ids ...int64) *UserUpdateOne {
+	_u.mutation.RemoveOperatedWalletTransactionIDs(ids...)
+	return _u
+}
+
+// RemoveOperatedWalletTransactions removes "operated_wallet_transactions" edges to WalletTransaction entities.
+func (_u *UserUpdateOne) RemoveOperatedWalletTransactions(v ...*WalletTransaction) *UserUpdateOne {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveOperatedWalletTransactionIDs(ids...)
 }
 
 // Where appends a list predicates to the UserUpdate builder.
@@ -3429,6 +3664,96 @@ func (_u *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(userplatformquota.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.WalletTransactionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.WalletTransactionsTable,
+			Columns: []string{user.WalletTransactionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(wallettransaction.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedWalletTransactionsIDs(); len(nodes) > 0 && !_u.mutation.WalletTransactionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.WalletTransactionsTable,
+			Columns: []string{user.WalletTransactionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(wallettransaction.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.WalletTransactionsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.WalletTransactionsTable,
+			Columns: []string{user.WalletTransactionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(wallettransaction.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.OperatedWalletTransactionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.OperatedWalletTransactionsTable,
+			Columns: []string{user.OperatedWalletTransactionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(wallettransaction.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedOperatedWalletTransactionsIDs(); len(nodes) > 0 && !_u.mutation.OperatedWalletTransactionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.OperatedWalletTransactionsTable,
+			Columns: []string{user.OperatedWalletTransactionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(wallettransaction.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.OperatedWalletTransactionsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.OperatedWalletTransactionsTable,
+			Columns: []string{user.OperatedWalletTransactionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(wallettransaction.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {

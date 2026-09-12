@@ -45,6 +45,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/userattributevalue"
 	"github.com/Wei-Shaw/sub2api/ent/userplatformquota"
 	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
+	"github.com/Wei-Shaw/sub2api/ent/wallettransaction"
 	"github.com/Wei-Shaw/sub2api/internal/domain"
 )
 
@@ -2474,6 +2475,48 @@ func init() {
 	usersubscriptionDescAssignedAt := usersubscriptionFields[12].Descriptor()
 	// usersubscription.DefaultAssignedAt holds the default value on creation for the assigned_at field.
 	usersubscription.DefaultAssignedAt = usersubscriptionDescAssignedAt.Default.(func() time.Time)
+	wallettransactionFields := schema.WalletTransaction{}.Fields()
+	_ = wallettransactionFields
+	// wallettransactionDescCurrency is the schema descriptor for currency field.
+	wallettransactionDescCurrency := wallettransactionFields[3].Descriptor()
+	// wallettransaction.DefaultCurrency holds the default value on creation for the currency field.
+	wallettransaction.DefaultCurrency = wallettransactionDescCurrency.Default.(string)
+	// wallettransaction.CurrencyValidator is a validator for the "currency" field. It is called by the builders before save.
+	wallettransaction.CurrencyValidator = wallettransactionDescCurrency.Validators[0].(func(string) error)
+	// wallettransactionDescReferenceType is the schema descriptor for reference_type field.
+	wallettransactionDescReferenceType := wallettransactionFields[6].Descriptor()
+	// wallettransaction.ReferenceTypeValidator is a validator for the "reference_type" field. It is called by the builders before save.
+	wallettransaction.ReferenceTypeValidator = wallettransactionDescReferenceType.Validators[0].(func(string) error)
+	// wallettransactionDescReferenceID is the schema descriptor for reference_id field.
+	wallettransactionDescReferenceID := wallettransactionFields[7].Descriptor()
+	// wallettransaction.ReferenceIDValidator is a validator for the "reference_id" field. It is called by the builders before save.
+	wallettransaction.ReferenceIDValidator = wallettransactionDescReferenceID.Validators[0].(func(string) error)
+	// wallettransactionDescIdempotencyKey is the schema descriptor for idempotency_key field.
+	wallettransactionDescIdempotencyKey := wallettransactionFields[8].Descriptor()
+	// wallettransaction.IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
+	wallettransaction.IdempotencyKeyValidator = wallettransactionDescIdempotencyKey.Validators[0].(func(string) error)
+	// wallettransactionDescRequestFingerprint is the schema descriptor for request_fingerprint field.
+	wallettransactionDescRequestFingerprint := wallettransactionFields[9].Descriptor()
+	// wallettransaction.RequestFingerprintValidator is a validator for the "request_fingerprint" field. It is called by the builders before save.
+	wallettransaction.RequestFingerprintValidator = wallettransactionDescRequestFingerprint.Validators[0].(func(string) error)
+	// wallettransactionDescSource is the schema descriptor for source field.
+	wallettransactionDescSource := wallettransactionFields[11].Descriptor()
+	// wallettransaction.SourceValidator is a validator for the "source" field. It is called by the builders before save.
+	wallettransaction.SourceValidator = wallettransactionDescSource.Validators[0].(func(string) error)
+	// wallettransactionDescNote is the schema descriptor for note field.
+	wallettransactionDescNote := wallettransactionFields[12].Descriptor()
+	// wallettransaction.DefaultNote holds the default value on creation for the note field.
+	wallettransaction.DefaultNote = wallettransactionDescNote.Default.(string)
+	// wallettransaction.NoteValidator is a validator for the "note" field. It is called by the builders before save.
+	wallettransaction.NoteValidator = wallettransactionDescNote.Validators[0].(func(string) error)
+	// wallettransactionDescMetadata is the schema descriptor for metadata field.
+	wallettransactionDescMetadata := wallettransactionFields[13].Descriptor()
+	// wallettransaction.DefaultMetadata holds the default value on creation for the metadata field.
+	wallettransaction.DefaultMetadata = wallettransactionDescMetadata.Default.(func() map[string]interface{})
+	// wallettransactionDescCreatedAt is the schema descriptor for created_at field.
+	wallettransactionDescCreatedAt := wallettransactionFields[14].Descriptor()
+	// wallettransaction.DefaultCreatedAt holds the default value on creation for the created_at field.
+	wallettransaction.DefaultCreatedAt = wallettransactionDescCreatedAt.Default.(func() time.Time)
 }
 
 const (

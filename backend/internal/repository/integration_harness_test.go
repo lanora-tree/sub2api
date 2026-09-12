@@ -135,7 +135,9 @@ func TestMain(m *testing.M) {
 }
 
 func dockerIsAvailable(ctx context.Context) bool {
-	cmd := exec.CommandContext(ctx, "docker", "info")
+	probeCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(probeCtx, "docker", "info")
 	cmd.Env = os.Environ()
 	return cmd.Run() == nil
 }

@@ -173,6 +173,8 @@ Chat Completions 普通与 Streaming 都必须请求或解析 usage。Reasoning 
 
 `users.balance` 是当前余额，`wallet_transactions` 是不可变总账。首次启用钱包时为每个用户写开账 adjustment，使所有流水之和等于当前余额。
 
+M6.1 基础实现采用全局唯一 `idempotency_key` 与规范化 SHA-256 fingerprint。并发重试先取得事务级 advisory lock：相同 key、相同 fingerprint 返回原流水，相同 key、不同 fingerprint 返回冲突。余额行使用 `SELECT ... FOR UPDATE` 串行化；更新余额和插入流水任一步失败都会回滚。`usage` 允许 `0.00000000` 以保留极小费用舍入后的审计记录，充值和退款必须为正，普通调账必须非零。
+
 ### 9.3 管理员充值
 
 Admin 写入必须带 Idempotency Key、note 和 operator ID。一个事务中完成用户锁、流水插入、余额更新和审计所需业务数据。审计日志可以在事务提交后写，但钱包流水本身已经保留操作人和 note。
@@ -264,8 +266,8 @@ Dashboard 的今日消费和本月消费按 usage 流水绝对值统计，退款
 
 ## 15. 待人工确认
 
-1. CNY 是否作为唯一权威币种。
-2. 空库启动或存量 USD 数据迁移方式。
-3. 是否允许零费用请求。
+1. CNY 已于 2026-09-12 确认为唯一权威币种。
+2. 当前 M0 无价值测试余额已确认按数值 1:1 开账；未来真实 USD 存量的汇率、时点和逐用户清单仍需另行确认。
+3. 当前设计允许零费用 usage 并写审计流水；若未来引入最低费用，需要作为独立价格决策确认。
 4. V1 退款是否只支持全额一次。
 5. 无完整 usage 的请求是否暂停全站 Gateway，当前建议进入 Billing degraded。

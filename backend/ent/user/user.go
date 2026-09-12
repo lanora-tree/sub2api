@@ -91,6 +91,10 @@ const (
 	EdgePendingAuthSessions = "pending_auth_sessions"
 	// EdgePlatformQuotas holds the string denoting the platform_quotas edge name in mutations.
 	EdgePlatformQuotas = "platform_quotas"
+	// EdgeWalletTransactions holds the string denoting the wallet_transactions edge name in mutations.
+	EdgeWalletTransactions = "wallet_transactions"
+	// EdgeOperatedWalletTransactions holds the string denoting the operated_wallet_transactions edge name in mutations.
+	EdgeOperatedWalletTransactions = "operated_wallet_transactions"
 	// EdgeUserAllowedGroups holds the string denoting the user_allowed_groups edge name in mutations.
 	EdgeUserAllowedGroups = "user_allowed_groups"
 	// Table holds the table name of the user in the database.
@@ -184,6 +188,20 @@ const (
 	PlatformQuotasInverseTable = "user_platform_quotas"
 	// PlatformQuotasColumn is the table column denoting the platform_quotas relation/edge.
 	PlatformQuotasColumn = "user_id"
+	// WalletTransactionsTable is the table that holds the wallet_transactions relation/edge.
+	WalletTransactionsTable = "wallet_transactions"
+	// WalletTransactionsInverseTable is the table name for the WalletTransaction entity.
+	// It exists in this package in order to avoid circular dependency with the "wallettransaction" package.
+	WalletTransactionsInverseTable = "wallet_transactions"
+	// WalletTransactionsColumn is the table column denoting the wallet_transactions relation/edge.
+	WalletTransactionsColumn = "user_id"
+	// OperatedWalletTransactionsTable is the table that holds the operated_wallet_transactions relation/edge.
+	OperatedWalletTransactionsTable = "wallet_transactions"
+	// OperatedWalletTransactionsInverseTable is the table name for the WalletTransaction entity.
+	// It exists in this package in order to avoid circular dependency with the "wallettransaction" package.
+	OperatedWalletTransactionsInverseTable = "wallet_transactions"
+	// OperatedWalletTransactionsColumn is the table column denoting the operated_wallet_transactions relation/edge.
+	OperatedWalletTransactionsColumn = "operator_id"
 	// UserAllowedGroupsTable is the table that holds the user_allowed_groups relation/edge.
 	UserAllowedGroupsTable = "user_allowed_groups"
 	// UserAllowedGroupsInverseTable is the table name for the UserAllowedGroup entity.
@@ -612,6 +630,34 @@ func ByPlatformQuotas(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
+// ByWalletTransactionsCount orders the results by wallet_transactions count.
+func ByWalletTransactionsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newWalletTransactionsStep(), opts...)
+	}
+}
+
+// ByWalletTransactions orders the results by wallet_transactions terms.
+func ByWalletTransactions(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newWalletTransactionsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByOperatedWalletTransactionsCount orders the results by operated_wallet_transactions count.
+func ByOperatedWalletTransactionsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newOperatedWalletTransactionsStep(), opts...)
+	}
+}
+
+// ByOperatedWalletTransactions orders the results by operated_wallet_transactions terms.
+func ByOperatedWalletTransactions(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newOperatedWalletTransactionsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByUserAllowedGroupsCount orders the results by user_allowed_groups count.
 func ByUserAllowedGroupsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -714,6 +760,20 @@ func newPlatformQuotasStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(PlatformQuotasInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, PlatformQuotasTable, PlatformQuotasColumn),
+	)
+}
+func newWalletTransactionsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(WalletTransactionsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, WalletTransactionsTable, WalletTransactionsColumn),
+	)
+}
+func newOperatedWalletTransactionsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(OperatedWalletTransactionsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, OperatedWalletTransactionsTable, OperatedWalletTransactionsColumn),
 	)
 }
 func newUserAllowedGroupsStep() *sqlgraph.Step {

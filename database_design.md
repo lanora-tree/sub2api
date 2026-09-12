@@ -63,6 +63,7 @@ V1 钱包由以下两部分组成：
 | `reference_type` | VARCHAR(32) | `usage_log`、`external_order`、`admin_operation` 等 |
 | `reference_id` | VARCHAR(128) | 稳定业务引用 |
 | `idempotency_key` | VARCHAR(160) | 业务幂等键 |
+| `request_fingerprint` | VARCHAR(64) | 规范化请求的 SHA-256；相同幂等键不同指纹拒绝 |
 | `operator_id` | BIGINT NULL | Admin User ID，系统结算为空 |
 | `source` | VARCHAR(64) | `gateway`、`admin` 或外部站点标识 |
 | `note` | VARCHAR(500) | 禁止写 Secret |
@@ -75,12 +76,17 @@ V1 钱包由以下两部分组成：
 CHECK (currency = 'CNY')
 CHECK (balance_after = balance_before + amount)
 CHECK (type IN ('recharge','usage','refund','adjustment'))
+CHECK (recharge/refund > 0, usage <= 0)
+CHECK (required text fields are not blank)
+CHECK (request_fingerprint is 64 lowercase hex characters)
 UNIQUE (idempotency_key)
 INDEX (user_id, created_at DESC, id DESC)
 INDEX (reference_type, reference_id)
 ```
 
 删除用户采用软删除。钱包流水不随用户删除。
+
+M6.1 已由 `240_cny_wallet_transactions.sql` 实现本表、数据库不可变 trigger、CNY opening adjustment 和上述约束。当前本地库只有 M0 无价值测试余额，产品负责人确认按数值 1:1 开账；真实 USD 存量不得复用该捷径。应用层使用 `shopspring/decimal`，通过用户行锁和事务级幂等 advisory lock，将 `users.balance` 更新与流水插入置于同一 PostgreSQL 事务。Admin 与 Gateway 旧写入口的切换属于后续 M6 子任务。
 
 ### 4.2 `model_pricing_rules`
 
@@ -396,8 +402,8 @@ HAVING u.balance <> COALESCE(SUM(w.amount), 0);
 
 ## 10. 待验证事项
 
-1. 实际目标数据库是否为空，决定 USD 到 CNY 的迁移方式。
-2. Ent 对 `decimal.Decimal` 的统一映射方案，需要先做小型 migration prototype。
+1. 当前本地数据库已确认为只有 M0 无价值测试余额并采用 1:1 CNY opening；任何真实 USD 目标库仍需单独决定迁移方式。
+2. Ent 对 `decimal.Decimal` 的映射 prototype 已在 M6.1 通过生成、编译和真实 PostgreSQL integration 验收。
 3. Composite target Group 在现有 Billing 和 Ops 投影中的最小改动点，需要 M6 用调用图和 migration prototype 确认。
 4. usage log 大表索引体积和保留周期，需要 M0 基线数据估算。
 5. 账号凭据整体加密后对 Scheduler 热路径的解密缓存方案，需要性能测试。

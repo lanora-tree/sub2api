@@ -1699,6 +1699,52 @@ func HasPlatformQuotasWith(preds ...predicate.UserPlatformQuota) predicate.User 
 	})
 }
 
+// HasWalletTransactions applies the HasEdge predicate on the "wallet_transactions" edge.
+func HasWalletTransactions() predicate.User {
+	return predicate.User(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, WalletTransactionsTable, WalletTransactionsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasWalletTransactionsWith applies the HasEdge predicate on the "wallet_transactions" edge with a given conditions (other predicates).
+func HasWalletTransactionsWith(preds ...predicate.WalletTransaction) predicate.User {
+	return predicate.User(func(s *sql.Selector) {
+		step := newWalletTransactionsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasOperatedWalletTransactions applies the HasEdge predicate on the "operated_wallet_transactions" edge.
+func HasOperatedWalletTransactions() predicate.User {
+	return predicate.User(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, OperatedWalletTransactionsTable, OperatedWalletTransactionsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasOperatedWalletTransactionsWith applies the HasEdge predicate on the "operated_wallet_transactions" edge with a given conditions (other predicates).
+func HasOperatedWalletTransactionsWith(preds ...predicate.WalletTransaction) predicate.User {
+	return predicate.User(func(s *sql.Selector) {
+		step := newOperatedWalletTransactionsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // HasUserAllowedGroups applies the HasEdge predicate on the "user_allowed_groups" edge.
 func HasUserAllowedGroups() predicate.User {
 	return predicate.User(func(s *sql.Selector) {

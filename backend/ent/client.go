@@ -54,6 +54,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/userattributevalue"
 	"github.com/Wei-Shaw/sub2api/ent/userplatformquota"
 	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
+	"github.com/Wei-Shaw/sub2api/ent/wallettransaction"
 
 	stdsql "database/sql"
 )
@@ -141,6 +142,8 @@ type Client struct {
 	UserPlatformQuota *UserPlatformQuotaClient
 	// UserSubscription is the client for interacting with the UserSubscription builders.
 	UserSubscription *UserSubscriptionClient
+	// WalletTransaction is the client for interacting with the WalletTransaction builders.
+	WalletTransaction *WalletTransactionClient
 }
 
 // NewClient creates a new client configured with the given options.
@@ -191,6 +194,7 @@ func (c *Client) init() {
 	c.UserAttributeValue = NewUserAttributeValueClient(c.config)
 	c.UserPlatformQuota = NewUserPlatformQuotaClient(c.config)
 	c.UserSubscription = NewUserSubscriptionClient(c.config)
+	c.WalletTransaction = NewWalletTransactionClient(c.config)
 }
 
 type (
@@ -322,6 +326,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		UserAttributeValue:            NewUserAttributeValueClient(cfg),
 		UserPlatformQuota:             NewUserPlatformQuotaClient(cfg),
 		UserSubscription:              NewUserSubscriptionClient(cfg),
+		WalletTransaction:             NewWalletTransactionClient(cfg),
 	}, nil
 }
 
@@ -380,6 +385,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		UserAttributeValue:            NewUserAttributeValueClient(cfg),
 		UserPlatformQuota:             NewUserPlatformQuotaClient(cfg),
 		UserSubscription:              NewUserSubscriptionClient(cfg),
+		WalletTransaction:             NewWalletTransactionClient(cfg),
 	}, nil
 }
 
@@ -419,7 +425,7 @@ func (c *Client) Use(hooks ...Hook) {
 		c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting, c.SubscriptionPlan,
 		c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
 		c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
-		c.UserPlatformQuota, c.UserSubscription,
+		c.UserPlatformQuota, c.UserSubscription, c.WalletTransaction,
 	} {
 		n.Use(hooks...)
 	}
@@ -439,7 +445,7 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting, c.SubscriptionPlan,
 		c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
 		c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
-		c.UserPlatformQuota, c.UserSubscription,
+		c.UserPlatformQuota, c.UserSubscription, c.WalletTransaction,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -526,6 +532,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.UserPlatformQuota.mutate(ctx, m)
 	case *UserSubscriptionMutation:
 		return c.UserSubscription.mutate(ctx, m)
+	case *WalletTransactionMutation:
+		return c.WalletTransaction.mutate(ctx, m)
 	default:
 		return nil, fmt.Errorf("ent: unknown mutation type %T", m)
 	}
@@ -5997,6 +6005,38 @@ func (c *UserClient) QueryPlatformQuotas(_m *User) *UserPlatformQuotaQuery {
 	return query
 }
 
+// QueryWalletTransactions queries the wallet_transactions edge of a User.
+func (c *UserClient) QueryWalletTransactions(_m *User) *WalletTransactionQuery {
+	query := (&WalletTransactionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, id),
+			sqlgraph.To(wallettransaction.Table, wallettransaction.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, user.WalletTransactionsTable, user.WalletTransactionsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryOperatedWalletTransactions queries the operated_wallet_transactions edge of a User.
+func (c *UserClient) QueryOperatedWalletTransactions(_m *User) *WalletTransactionQuery {
+	query := (&WalletTransactionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, id),
+			sqlgraph.To(wallettransaction.Table, wallettransaction.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, user.OperatedWalletTransactionsTable, user.OperatedWalletTransactionsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryUserAllowedGroups queries the user_allowed_groups edge of a User.
 func (c *UserClient) QueryUserAllowedGroups(_m *User) *UserAllowedGroupQuery {
 	query := (&UserAllowedGroupClient{config: c.config}).Query()
@@ -6822,6 +6862,171 @@ func (c *UserSubscriptionClient) mutate(ctx context.Context, m *UserSubscription
 	}
 }
 
+// WalletTransactionClient is a client for the WalletTransaction schema.
+type WalletTransactionClient struct {
+	config
+}
+
+// NewWalletTransactionClient returns a client for the WalletTransaction from the given config.
+func NewWalletTransactionClient(c config) *WalletTransactionClient {
+	return &WalletTransactionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `wallettransaction.Hooks(f(g(h())))`.
+func (c *WalletTransactionClient) Use(hooks ...Hook) {
+	c.hooks.WalletTransaction = append(c.hooks.WalletTransaction, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `wallettransaction.Intercept(f(g(h())))`.
+func (c *WalletTransactionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.WalletTransaction = append(c.inters.WalletTransaction, interceptors...)
+}
+
+// Create returns a builder for creating a WalletTransaction entity.
+func (c *WalletTransactionClient) Create() *WalletTransactionCreate {
+	mutation := newWalletTransactionMutation(c.config, OpCreate)
+	return &WalletTransactionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of WalletTransaction entities.
+func (c *WalletTransactionClient) CreateBulk(builders ...*WalletTransactionCreate) *WalletTransactionCreateBulk {
+	return &WalletTransactionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *WalletTransactionClient) MapCreateBulk(slice any, setFunc func(*WalletTransactionCreate, int)) *WalletTransactionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &WalletTransactionCreateBulk{err: fmt.Errorf("calling to WalletTransactionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*WalletTransactionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &WalletTransactionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for WalletTransaction.
+func (c *WalletTransactionClient) Update() *WalletTransactionUpdate {
+	mutation := newWalletTransactionMutation(c.config, OpUpdate)
+	return &WalletTransactionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *WalletTransactionClient) UpdateOne(_m *WalletTransaction) *WalletTransactionUpdateOne {
+	mutation := newWalletTransactionMutation(c.config, OpUpdateOne, withWalletTransaction(_m))
+	return &WalletTransactionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *WalletTransactionClient) UpdateOneID(id int64) *WalletTransactionUpdateOne {
+	mutation := newWalletTransactionMutation(c.config, OpUpdateOne, withWalletTransactionID(id))
+	return &WalletTransactionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for WalletTransaction.
+func (c *WalletTransactionClient) Delete() *WalletTransactionDelete {
+	mutation := newWalletTransactionMutation(c.config, OpDelete)
+	return &WalletTransactionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *WalletTransactionClient) DeleteOne(_m *WalletTransaction) *WalletTransactionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *WalletTransactionClient) DeleteOneID(id int64) *WalletTransactionDeleteOne {
+	builder := c.Delete().Where(wallettransaction.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &WalletTransactionDeleteOne{builder}
+}
+
+// Query returns a query builder for WalletTransaction.
+func (c *WalletTransactionClient) Query() *WalletTransactionQuery {
+	return &WalletTransactionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeWalletTransaction},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a WalletTransaction entity by its id.
+func (c *WalletTransactionClient) Get(ctx context.Context, id int64) (*WalletTransaction, error) {
+	return c.Query().Where(wallettransaction.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *WalletTransactionClient) GetX(ctx context.Context, id int64) *WalletTransaction {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryUser queries the user edge of a WalletTransaction.
+func (c *WalletTransactionClient) QueryUser(_m *WalletTransaction) *UserQuery {
+	query := (&UserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(wallettransaction.Table, wallettransaction.FieldID, id),
+			sqlgraph.To(user.Table, user.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, wallettransaction.UserTable, wallettransaction.UserColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryOperator queries the operator edge of a WalletTransaction.
+func (c *WalletTransactionClient) QueryOperator(_m *WalletTransaction) *UserQuery {
+	query := (&UserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(wallettransaction.Table, wallettransaction.FieldID, id),
+			sqlgraph.To(user.Table, user.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, wallettransaction.OperatorTable, wallettransaction.OperatorColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *WalletTransactionClient) Hooks() []Hook {
+	return c.hooks.WalletTransaction
+}
+
+// Interceptors returns the client interceptors.
+func (c *WalletTransactionClient) Interceptors() []Interceptor {
+	return c.inters.WalletTransaction
+}
+
+func (c *WalletTransactionClient) mutate(ctx context.Context, m *WalletTransactionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&WalletTransactionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&WalletTransactionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&WalletTransactionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&WalletTransactionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown WalletTransaction mutation op: %q", m.Op())
+	}
+}
+
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
@@ -6834,7 +7039,7 @@ type (
 		PromoCodeUsage, Proxy, RedeemCode, SecuritySecret, Setting, SubscriptionPlan,
 		TLSFingerprintProfile, UsageCleanupTask, UsageLog, User, UserAllowedGroup,
 		UserAttributeDefinition, UserAttributeValue, UserPlatformQuota,
-		UserSubscription []ent.Hook
+		UserSubscription, WalletTransaction []ent.Hook
 	}
 	inters struct {
 		APIKey, Account, AccountGroup, Announcement, AnnouncementRead, AuthIdentity,
@@ -6846,7 +7051,7 @@ type (
 		PromoCodeUsage, Proxy, RedeemCode, SecuritySecret, Setting, SubscriptionPlan,
 		TLSFingerprintProfile, UsageCleanupTask, UsageLog, User, UserAllowedGroup,
 		UserAttributeDefinition, UserAttributeValue, UserPlatformQuota,
-		UserSubscription []ent.Interceptor
+		UserSubscription, WalletTransaction []ent.Interceptor
 	}
 )
 

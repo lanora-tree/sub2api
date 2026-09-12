@@ -24,6 +24,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/userattributevalue"
 	"github.com/Wei-Shaw/sub2api/ent/userplatformquota"
 	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
+	"github.com/Wei-Shaw/sub2api/ent/wallettransaction"
 )
 
 // UserCreate is the builder for creating a User entity.
@@ -563,6 +564,36 @@ func (_c *UserCreate) AddPlatformQuotas(v ...*UserPlatformQuota) *UserCreate {
 	return _c.AddPlatformQuotaIDs(ids...)
 }
 
+// AddWalletTransactionIDs adds the "wallet_transactions" edge to the WalletTransaction entity by IDs.
+func (_c *UserCreate) AddWalletTransactionIDs(ids ...int64) *UserCreate {
+	_c.mutation.AddWalletTransactionIDs(ids...)
+	return _c
+}
+
+// AddWalletTransactions adds the "wallet_transactions" edges to the WalletTransaction entity.
+func (_c *UserCreate) AddWalletTransactions(v ...*WalletTransaction) *UserCreate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddWalletTransactionIDs(ids...)
+}
+
+// AddOperatedWalletTransactionIDs adds the "operated_wallet_transactions" edge to the WalletTransaction entity by IDs.
+func (_c *UserCreate) AddOperatedWalletTransactionIDs(ids ...int64) *UserCreate {
+	_c.mutation.AddOperatedWalletTransactionIDs(ids...)
+	return _c
+}
+
+// AddOperatedWalletTransactions adds the "operated_wallet_transactions" edges to the WalletTransaction entity.
+func (_c *UserCreate) AddOperatedWalletTransactions(v ...*WalletTransaction) *UserCreate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddOperatedWalletTransactionIDs(ids...)
+}
+
 // Mutation returns the UserMutation object of the builder.
 func (_c *UserCreate) Mutation() *UserMutation {
 	return _c.mutation
@@ -1098,6 +1129,38 @@ func (_c *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(userplatformquota.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.WalletTransactionsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.WalletTransactionsTable,
+			Columns: []string{user.WalletTransactionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(wallettransaction.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.OperatedWalletTransactionsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.OperatedWalletTransactionsTable,
+			Columns: []string{user.OperatedWalletTransactionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(wallettransaction.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {

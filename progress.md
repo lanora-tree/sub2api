@@ -4,12 +4,12 @@
 
 * 项目代号：中转站
 * 上游项目：Sub2API
-* 记录日期：2026-09-12 UTC+8
-* 当前阶段：M2 公开与商业功能范围收口
-* 阶段状态：`completed`
-* 下一阶段：M6 用户、密钥、路由与钱包基础
+* 记录日期：2026-09-13 UTC+8
+* 当前阶段：M6 用户、密钥、路由与钱包基础
+* 阶段状态：`in_progress`
+* 当前任务：M6.2 管理员充值、退款、调账与余额查询接入
 
-M0 与 M1 已完成。M2 已在固定基线上实现数据库默认关闭、前端入口/直接路由拦截和后端 fail-closed 守卫；全量前后端测试、生产构建、Compose 配置、数据库迁移及本地黑盒 API 验收均通过。未接入真实 Provider 凭据或真实收费数据。
+M0、M1 与 M2 已完成。M6.1 已建立 CNY 不可变钱包流水和 Decimal 事务基础，并通过真实 PostgreSQL 并发、幂等、回滚、开账、不可变与对账验收；当前按顺序进入 M6.2。未接入真实 Provider 凭据或真实收费数据。
 
 ## 2. 里程碑看板
 
@@ -21,7 +21,7 @@ M0 与 M1 已完成。M2 已在固定基线上实现数据库默认关闭、前�
 | M3 | Codex Subscription 验证 | `pending` | 等待 M2、M6、M7、合规确认和合法测试账号 |
 | M4 | OpenAI Official API | `pending` | 等待 M2、M6、M7 的基础能力 |
 | M5 | DeepSeek Official API | `pending` | 等待 M2、M6、M7、模型名和价格人工确认 |
-| M6 | 用户、密钥、路由与钱包基础 | `pending` | 等待数据库方案确认 |
+| M6 | 用户、密钥、路由与钱包基础 | `in_progress` | M6.1 已验收；进入 M6.2 管理员钱包接口 |
 | M7 | 动态价格与历史快照 | `pending` | 等待 M6 |
 | M8 | Internal Recharge API | `pending` | 等待 M6 和密钥方案 |
 | M9 | 管理后台精简 | `pending` | 等待核心后端功能稳定 |
@@ -452,7 +452,95 @@ M2 无剩余阻塞。M6 涉及权威记账币种、不可变钱包流水、Key �
 
 按主路径进入 M6，先固化 CNY/存量数据迁移决策和 schema，再实现钱包事务、用户模型权限、API Key 摘要、Account credential 加密与显式目标 Group 路由。
 
-## 15. 后续记录模板
+## 15. 2026-09-12 / M6.1 开始：CNY 钱包流水基础
+
+### 范围与决策
+
+产品负责人已明确确认 CNY 为全站唯一权威记账币种。本任务只完成 `wallet_transactions`、现有测试余额开账、Decimal 金额边界和可重复对账基础，不在同一提交顺带实现 API Key 摘要、Account credential 加密、用户模型权限或 Composite target Group。
+
+### 敏感改动说明
+
+* 原因：现有 `users.balance` 只有当前值，无法形成不可变、可审计的 CNY 总账；新增账务功能继续使用 float 会扩大精度与并发风险。
+* 影响面：`backend/ent/schema`、新增 migration、钱包 repository/service、Admin 余额变更的后续接入点，以及对应集成/并发/对账测试。Gateway usage 扣款暂不在本子任务切换，避免跨任务大改结算热路径。
+* 回滚方式：应用可回退至 M2，仍以 `users.balance` 运行；migration 为 forward-only，不删除流水表或开账数据。测试库可从升级前备份恢复，生产不得执行逆向删除。
+* 数据策略：当前库只有 M0 无价值测试余额，按数值 1:1 记为 CNY opening adjustment；不做汇率换算。任何真实 USD 存量必须另建经批准的迁移清单与汇率快照。
+
+### 预计修改文件
+
+* `backend/ent/schema/wallet_transaction.go`、User edge 与 Ent 生成文件。
+* `backend/migrations/240_cny_wallet_transactions.sql` 及 schema/migration 测试。
+* 独立的钱包 domain/repository/service 文件和 Decimal、并发、幂等、不可变、对账测试。
+* `database_design.md`、`billing_design.md`、`findings.md`、`progress.md`、`CHANGELOG-custom.md`。
+
+### 验收命令
+
+* 聚焦 Go unit、repository integration 与 migration schema 测试。
+* 真实 PostgreSQL 升级：检查 opening 流水、`SUM(amount)=users.balance`、唯一约束与 UPDATE/DELETE 拒绝。
+* `go test ./...`、`git diff --check`、Compose 健康与 migration checksum 检查。
+
+### 已实现
+
+* 新增 `wallet_transactions` migration、CNY opening adjustment、数据库金额/符号/指纹/文本约束、查询索引和 UPDATE/DELETE 拒绝 trigger。
+* 新增 WalletTransaction Ent schema 并生成关联代码；所有流水字段与边均为 immutable，外键删除策略为 RESTRICT。
+* 新增 Decimal 钱包命令、固定八位表示、CNY/符号/长度校验、规范化 metadata 与 SHA-256 fingerprint。
+* 新增原生 SQL wallet repository：事务级 advisory lock 防幂等竞态、`SELECT ... FOR UPDATE` 串行化用户余额、余额更新与流水插入同事务、失败回滚和精确对账。
+* usage 允许零金额审计流水；充值/退款为正，usage 为零或负，普通调账非零；opening migration 可以为零。
+* 新增单元、SQL mock、migration schema、不可变、opening、并发重试、并发余额与对账测试；integration harness 的 Docker 探测增加 5 秒超时。
+
+### 当前验证结果
+
+| 检查 | 结果 |
+| --- | --- |
+| Wallet service 定向测试 | 通过 |
+| Wallet repository SQL mock | 通过 |
+| Repository 全套非 integration | 通过；需在测试子进程清空强制 `127.0.0.1:9` HTTP 代理，避免本地 Aliyun mock 被代理 |
+| Migration 与 Ent 全套 | 通过 |
+| Ent / Wire generate | 通过 |
+| Integration 测试源码 | `go test -c -tags integration` 通过，生成 114 MB 测试二进制 |
+| PostgreSQL 并发/开账/trigger 实跑 | 待 Docker 恢复；当前未虚报为通过 |
+| Service 全套非 integration | 钱包用例通过；另有 4 个 Windows plugin 临时文件占用失败和 1 个 content moderation 1 秒异步等待失败，均不在 M6.1 调用链 |
+| `git diff --check` | 通过，仅有 Git 的 CRLF 转换提示 |
+
+### 环境事件与恢复
+
+Docker Desktop 4.68.0 因上次异常退出留下 AF_UNIX socket reparse point，启动时依次在 `dockerInference` 和 `docker-secrets-engine\\engine.sock` 失败。已把以下纯运行目录原地改名保留，未触碰镜像、容器、卷或 VHDX：
+
+* `%LOCALAPPDATA%\\Docker\\run.stale-20260912-202922`
+* `%LOCALAPPDATA%\\docker-secrets-engine.stale-20260912-203343`
+
+Docker 在当前 Windows 会话仍会重现新套接字故障。官方同类问题的恢复记录要求完整重启 Windows；用户确认重启后，先检查 Docker 健康，再执行 PostgreSQL integration、升级库 migration、opening 对账和 trigger 黑盒验收。
+
+### 当前状态与下一步
+
+M6.1 实现完成但动态数据库验收未完成，保持 `in_progress`。Windows 重启恢复 Docker 后立即补齐真实 PostgreSQL 证据；随后才本地提交本子任务，并按顺序进入 M6.2 管理员充值/退款/调账接入。Gateway usage 事务切换仍留在后续 M6 账务整合任务。
+
+## 16. 2026-09-13 / M6.1 完成：CNY 钱包流水基础
+
+### 完成任务
+
+* Windows 重启后确认 Docker Desktop 首次仍被旧 `Docker\\run\\dockerInference` 重解析点阻塞；在 Docker 进程退出后将精确运行目录移动到 `run.stale-after-reboot-20260912-221448`，再次启动后 Linux Engine 恢复。未执行 factory reset，未触碰镜像、容器、卷或 VHDX。
+* 对当前本地测试库执行升级前 `pg_dump`，备份保存于 `%TEMP%\\sub2api-m6-backups\\pre-m6-wallet-20260913-015958.dump`，`pg_restore -l` 可读取 1193 个 TOC 条目。
+* 在 Go 1.27 Linux builder 中通过 Docker socket 启动 PostgreSQL 18 与 Redis 8.4，实跑 migration schema、opening、不可变 trigger、并发更新、并发幂等重放、失败回滚和精确对账测试。
+* 构建 `sub2api:m6-wallet-foundation`，以独立无宿主端口的临时实例连接现有本地测试库执行 migration；实例健康后完成只读对账并移除。稳定的 M2 实例全程保持健康。
+
+### 动态数据库证据
+
+| 检查 | 结果 |
+| --- | --- |
+| Docker Engine | Client/Server `29.3.1`，Docker Desktop Linux Engine 正常 |
+| 聚焦 integration | `go test -tags integration ./internal/repository` 的 M6.1 用例全部通过，包耗时 `10.461s` |
+| 本地 migration | `240_cny_wallet_transactions.sql` 已记录，SHA-256 checksum 长度 64 |
+| 本地 opening | 2 个 User、2 条 opening 流水、2 个唯一幂等键 |
+| 本地对账 | `users.balance - SUM(wallet_transactions.amount)` 差异用户数为 0 |
+| 约束与 trigger | 非 CNY 流水为 0；不可变 trigger 恰好 1 个；`users.balance` 为 `NUMERIC(20,8)` |
+| Backend 全量 | Linux Go 1.27 执行 `go test ./... -count=1`，所有 package 通过，包括 service、repository、migration 与 Ent schema |
+| Runtime | M6.1 临时实例健康；验收后已移除，M2 的 Backend、PostgreSQL、Redis 均保持 healthy |
+
+### 状态与下一步
+
+M6.1 完成并可形成独立提交。Migration 已在本地测试库执行，因此 `240_cny_wallet_transactions.sql` 从此按已发布 migration 对待，不得重写、重命名或删除。M6 继续保持 `in_progress`，下一项为 M6.2：把管理员充值、退款、调账和用户余额查询接入钱包事务与授权边界；Gateway usage 事务切换仍留在后续 M6 账务整合任务。
+
+## 17. 后续记录模板
 
 每次工作结束追加一节，不覆盖历史记录。
 
