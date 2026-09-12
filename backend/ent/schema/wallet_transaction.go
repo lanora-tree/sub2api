@@ -66,6 +66,10 @@ func (WalletTransaction) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			Immutable(),
+		field.Int64("reverses_transaction_id").
+			Optional().
+			Nillable().
+			Immutable(),
 		field.String("source").
 			MaxLen(64).
 			Immutable(),
@@ -95,6 +99,14 @@ func (WalletTransaction) Edges() []ent.Edge {
 		edge.From("operator", User.Type).
 			Ref("operated_wallet_transactions").
 			Field("operator_id").
+			Annotations(entsql.OnDelete(entsql.Restrict)).
+			Unique().
+			Immutable(),
+		edge.To("refund", WalletTransaction.Type).
+			Unique(),
+		edge.From("reverses", WalletTransaction.Type).
+			Ref("refund").
+			Field("reverses_transaction_id").
 			Annotations(entsql.OnDelete(entsql.Restrict)).
 			Unique().
 			Immutable(),

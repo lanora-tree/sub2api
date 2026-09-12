@@ -160,13 +160,17 @@ WHERE ns.nspname = 'public'
 	requireNumericColumn(t, tx, "wallet_transactions", "balance_before", 20, 8, false)
 	requireNumericColumn(t, tx, "wallet_transactions", "balance_after", 20, 8, false)
 	requireColumn(t, tx, "wallet_transactions", "currency", "character", 3, false)
+	requireColumn(t, tx, "wallet_transactions", "reverses_transaction_id", "bigint", 0, true)
 	requireIndex(t, tx, "wallet_transactions", "idx_wallet_transactions_user_created")
 	requireIndex(t, tx, "wallet_transactions", "idx_wallet_transactions_reference")
+	requirePartialUniqueIndexDefinition(t, tx, "wallet_transactions", "idx_wallet_transactions_one_refund_per_usage", "reverses_transaction_id", "refund")
+	requireForeignKeyOnDelete(t, tx, "wallet_transactions", "reverses_transaction_id", "wallet_transactions", "RESTRICT")
 	requireConstraintDefinitionContains(t, tx, "wallet_transactions", "wallet_transactions_currency_check", "currency", "'CNY'")
 	requireConstraintDefinitionContains(t, tx, "wallet_transactions", "wallet_transactions_amount_sign_check", "recharge", "refund", "usage", "amount")
 	requireConstraintDefinitionContains(t, tx, "wallet_transactions", "wallet_transactions_balance_equation_check", "balance_after", "balance_before", "amount")
 	requireConstraintDefinitionContains(t, tx, "wallet_transactions", "wallet_transactions_required_text_check", "reference_type", "reference_id", "idempotency_key", "source")
 	requireConstraintDefinitionContains(t, tx, "wallet_transactions", "wallet_transactions_fingerprint_check", "request_fingerprint")
+	requireConstraintDefinitionContains(t, tx, "wallet_transactions", "wallet_transactions_refund_link_check", "refund", "reverses_transaction_id")
 	var immutableTrigger bool
 	require.NoError(t, tx.QueryRowContext(context.Background(), `
 SELECT EXISTS (
@@ -178,6 +182,17 @@ SELECT EXISTS (
 )
 `).Scan(&immutableTrigger))
 	require.True(t, immutableTrigger, "expected immutable wallet transaction trigger")
+	var refundValidationTrigger bool
+	require.NoError(t, tx.QueryRowContext(context.Background(), `
+SELECT EXISTS (
+	SELECT 1
+	FROM pg_trigger
+	WHERE tgrelid = 'public.wallet_transactions'::regclass
+	  AND tgname = 'trg_wallet_refund_validate_insert'
+	  AND NOT tgisinternal
+)
+`).Scan(&refundValidationTrigger))
+	require.True(t, refundValidationTrigger, "expected wallet refund validation trigger")
 
 	// scheduler_outbox pending dedup support
 	requireColumn(t, tx, "scheduler_outbox", "dedup_key", "text", 0, true)
@@ -275,6 +290,73 @@ WHERE idempotency_key = $1
 	var pgErr *pq.Error
 	require.ErrorAs(t, err, &pgErr)
 	require.Equal(t, pq.ErrorCode("55000"), pgErr.Code)
+}
+
+func TestMigrationsRunner_WalletRefundTriggerAndUniqueLink(t *testing.T) {
+	tx := testTx(t)
+	ctx := context.Background()
+	var userID int64
+	require.NoError(t, tx.QueryRowContext(ctx, `
+INSERT INTO users (email, password_hash, role, balance)
+VALUES ('wallet-refund-migration@example.test', 'not-a-real-hash', 'user', 10)
+RETURNING id
+`).Scan(&userID))
+
+	var usageID int64
+	require.NoError(t, tx.QueryRowContext(ctx, `
+INSERT INTO wallet_transactions (
+	user_id, type, amount, currency, balance_before, balance_after,
+	reference_type, reference_id, idempotency_key, request_fingerprint, source
+) VALUES ($1, 'usage', -1.25, 'CNY', 10, 8.75,
+	'usage_request', 'refund-trigger-test', 'refund-trigger-usage', repeat('a', 64), 'integration_test')
+RETURNING id
+`, userID).Scan(&usageID))
+
+	_, err := tx.ExecContext(ctx, `SAVEPOINT before_invalid_refund`)
+	require.NoError(t, err)
+	_, err = tx.ExecContext(ctx, `
+INSERT INTO wallet_transactions (
+	user_id, type, amount, currency, balance_before, balance_after,
+	reference_type, reference_id, idempotency_key, request_fingerprint,
+	reverses_transaction_id, source
+) VALUES ($1, 'refund', 1.00, 'CNY', 8.75, 9.75,
+	'wallet_transaction', $2::text, 'refund-trigger-wrong-amount', repeat('b', 64),
+	$2::bigint, 'integration_test')
+`, userID, usageID)
+	require.Error(t, err)
+	var pgErr *pq.Error
+	require.ErrorAs(t, err, &pgErr)
+	require.Equal(t, pq.ErrorCode("23514"), pgErr.Code)
+	_, err = tx.ExecContext(ctx, `ROLLBACK TO SAVEPOINT before_invalid_refund`)
+	require.NoError(t, err)
+
+	_, err = tx.ExecContext(ctx, `SAVEPOINT before_duplicate_refund`)
+	require.NoError(t, err)
+	_, err = tx.ExecContext(ctx, `
+INSERT INTO wallet_transactions (
+	user_id, type, amount, currency, balance_before, balance_after,
+	reference_type, reference_id, idempotency_key, request_fingerprint,
+	reverses_transaction_id, source
+) VALUES ($1, 'refund', 1.25, 'CNY', 8.75, 10.00,
+	'wallet_transaction', $2::text, 'refund-trigger-valid', repeat('c', 64),
+	$2::bigint, 'integration_test')
+`, userID, usageID)
+	require.NoError(t, err)
+
+	_, err = tx.ExecContext(ctx, `
+INSERT INTO wallet_transactions (
+	user_id, type, amount, currency, balance_before, balance_after,
+	reference_type, reference_id, idempotency_key, request_fingerprint,
+	reverses_transaction_id, source
+) VALUES ($1, 'refund', 1.25, 'CNY', 8.75, 10.00,
+	'wallet_transaction', $2::text, 'refund-trigger-duplicate', repeat('d', 64),
+	$2::bigint, 'integration_test')
+`, userID, usageID)
+	require.Error(t, err)
+	require.ErrorAs(t, err, &pgErr)
+	require.Equal(t, pq.ErrorCode("23505"), pgErr.Code)
+	_, err = tx.ExecContext(ctx, `ROLLBACK TO SAVEPOINT before_duplicate_refund`)
+	require.NoError(t, err)
 }
 
 func requireIndex(t *testing.T, tx *sql.Tx, table, index string) {

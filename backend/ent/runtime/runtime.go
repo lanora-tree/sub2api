@@ -2500,21 +2500,21 @@ func init() {
 	// wallettransaction.RequestFingerprintValidator is a validator for the "request_fingerprint" field. It is called by the builders before save.
 	wallettransaction.RequestFingerprintValidator = wallettransactionDescRequestFingerprint.Validators[0].(func(string) error)
 	// wallettransactionDescSource is the schema descriptor for source field.
-	wallettransactionDescSource := wallettransactionFields[11].Descriptor()
+	wallettransactionDescSource := wallettransactionFields[12].Descriptor()
 	// wallettransaction.SourceValidator is a validator for the "source" field. It is called by the builders before save.
 	wallettransaction.SourceValidator = wallettransactionDescSource.Validators[0].(func(string) error)
 	// wallettransactionDescNote is the schema descriptor for note field.
-	wallettransactionDescNote := wallettransactionFields[12].Descriptor()
+	wallettransactionDescNote := wallettransactionFields[13].Descriptor()
 	// wallettransaction.DefaultNote holds the default value on creation for the note field.
 	wallettransaction.DefaultNote = wallettransactionDescNote.Default.(string)
 	// wallettransaction.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	wallettransaction.NoteValidator = wallettransactionDescNote.Validators[0].(func(string) error)
 	// wallettransactionDescMetadata is the schema descriptor for metadata field.
-	wallettransactionDescMetadata := wallettransactionFields[13].Descriptor()
+	wallettransactionDescMetadata := wallettransactionFields[14].Descriptor()
 	// wallettransaction.DefaultMetadata holds the default value on creation for the metadata field.
 	wallettransaction.DefaultMetadata = wallettransactionDescMetadata.Default.(func() map[string]interface{})
 	// wallettransactionDescCreatedAt is the schema descriptor for created_at field.
-	wallettransactionDescCreatedAt := wallettransactionFields[14].Descriptor()
+	wallettransactionDescCreatedAt := wallettransactionFields[15].Descriptor()
 	// wallettransaction.DefaultCreatedAt holds the default value on creation for the created_at field.
 	wallettransaction.DefaultCreatedAt = wallettransactionDescCreatedAt.Default.(func() time.Time)
 }

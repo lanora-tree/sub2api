@@ -27,9 +27,34 @@ func (_u *WalletTransactionUpdate) Where(ps ...predicate.WalletTransaction) *Wal
 	return _u
 }
 
+// SetRefundID sets the "refund" edge to the WalletTransaction entity by ID.
+func (_u *WalletTransactionUpdate) SetRefundID(id int64) *WalletTransactionUpdate {
+	_u.mutation.SetRefundID(id)
+	return _u
+}
+
+// SetNillableRefundID sets the "refund" edge to the WalletTransaction entity by ID if the given value is not nil.
+func (_u *WalletTransactionUpdate) SetNillableRefundID(id *int64) *WalletTransactionUpdate {
+	if id != nil {
+		_u = _u.SetRefundID(*id)
+	}
+	return _u
+}
+
+// SetRefund sets the "refund" edge to the WalletTransaction entity.
+func (_u *WalletTransactionUpdate) SetRefund(v *WalletTransaction) *WalletTransactionUpdate {
+	return _u.SetRefundID(v.ID)
+}
+
 // Mutation returns the WalletTransactionMutation object of the builder.
 func (_u *WalletTransactionUpdate) Mutation() *WalletTransactionMutation {
 	return _u.mutation
+}
+
+// ClearRefund clears the "refund" edge to the WalletTransaction entity.
+func (_u *WalletTransactionUpdate) ClearRefund() *WalletTransactionUpdate {
+	_u.mutation.ClearRefund()
+	return _u
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -79,6 +104,35 @@ func (_u *WalletTransactionUpdate) sqlSave(ctx context.Context) (_node int, err 
 			}
 		}
 	}
+	if _u.mutation.RefundCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: false,
+			Table:   wallettransaction.RefundTable,
+			Columns: []string{wallettransaction.RefundColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(wallettransaction.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RefundIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: false,
+			Table:   wallettransaction.RefundTable,
+			Columns: []string{wallettransaction.RefundColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(wallettransaction.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{wallettransaction.Label}
@@ -99,9 +153,34 @@ type WalletTransactionUpdateOne struct {
 	mutation *WalletTransactionMutation
 }
 
+// SetRefundID sets the "refund" edge to the WalletTransaction entity by ID.
+func (_u *WalletTransactionUpdateOne) SetRefundID(id int64) *WalletTransactionUpdateOne {
+	_u.mutation.SetRefundID(id)
+	return _u
+}
+
+// SetNillableRefundID sets the "refund" edge to the WalletTransaction entity by ID if the given value is not nil.
+func (_u *WalletTransactionUpdateOne) SetNillableRefundID(id *int64) *WalletTransactionUpdateOne {
+	if id != nil {
+		_u = _u.SetRefundID(*id)
+	}
+	return _u
+}
+
+// SetRefund sets the "refund" edge to the WalletTransaction entity.
+func (_u *WalletTransactionUpdateOne) SetRefund(v *WalletTransaction) *WalletTransactionUpdateOne {
+	return _u.SetRefundID(v.ID)
+}
+
 // Mutation returns the WalletTransactionMutation object of the builder.
 func (_u *WalletTransactionUpdateOne) Mutation() *WalletTransactionMutation {
 	return _u.mutation
+}
+
+// ClearRefund clears the "refund" edge to the WalletTransaction entity.
+func (_u *WalletTransactionUpdateOne) ClearRefund() *WalletTransactionUpdateOne {
+	_u.mutation.ClearRefund()
+	return _u
 }
 
 // Where appends a list predicates to the WalletTransactionUpdate builder.
@@ -180,6 +259,35 @@ func (_u *WalletTransactionUpdateOne) sqlSave(ctx context.Context) (_node *Walle
 				ps[i](selector)
 			}
 		}
+	}
+	if _u.mutation.RefundCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: false,
+			Table:   wallettransaction.RefundTable,
+			Columns: []string{wallettransaction.RefundColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(wallettransaction.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RefundIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: false,
+			Table:   wallettransaction.RefundTable,
+			Columns: []string{wallettransaction.RefundColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(wallettransaction.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_node = &WalletTransaction{config: _u.config}
 	_spec.Assign = _node.assignValues

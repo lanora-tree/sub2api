@@ -42,6 +42,8 @@ type WalletTransaction struct {
 	RequestFingerprint string `json:"request_fingerprint,omitempty"`
 	// OperatorID holds the value of the "operator_id" field.
 	OperatorID *int64 `json:"operator_id,omitempty"`
+	// ReversesTransactionID holds the value of the "reverses_transaction_id" field.
+	ReversesTransactionID *int64 `json:"reverses_transaction_id,omitempty"`
 	// Source holds the value of the "source" field.
 	Source string `json:"source,omitempty"`
 	// Note holds the value of the "note" field.
@@ -62,9 +64,13 @@ type WalletTransactionEdges struct {
 	User *User `json:"user,omitempty"`
 	// Operator holds the value of the operator edge.
 	Operator *User `json:"operator,omitempty"`
+	// Refund holds the value of the refund edge.
+	Refund *WalletTransaction `json:"refund,omitempty"`
+	// Reverses holds the value of the reverses edge.
+	Reverses *WalletTransaction `json:"reverses,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [2]bool
+	loadedTypes [4]bool
 }
 
 // UserOrErr returns the User value or an error if the edge
@@ -89,6 +95,28 @@ func (e WalletTransactionEdges) OperatorOrErr() (*User, error) {
 	return nil, &NotLoadedError{edge: "operator"}
 }
 
+// RefundOrErr returns the Refund value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e WalletTransactionEdges) RefundOrErr() (*WalletTransaction, error) {
+	if e.Refund != nil {
+		return e.Refund, nil
+	} else if e.loadedTypes[2] {
+		return nil, &NotFoundError{label: wallettransaction.Label}
+	}
+	return nil, &NotLoadedError{edge: "refund"}
+}
+
+// ReversesOrErr returns the Reverses value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e WalletTransactionEdges) ReversesOrErr() (*WalletTransaction, error) {
+	if e.Reverses != nil {
+		return e.Reverses, nil
+	} else if e.loadedTypes[3] {
+		return nil, &NotFoundError{label: wallettransaction.Label}
+	}
+	return nil, &NotLoadedError{edge: "reverses"}
+}
+
 // scanValues returns the types for scanning values from sql.Rows.
 func (*WalletTransaction) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
@@ -98,7 +126,7 @@ func (*WalletTransaction) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case wallettransaction.FieldAmount, wallettransaction.FieldBalanceBefore, wallettransaction.FieldBalanceAfter:
 			values[i] = new(decimal.Decimal)
-		case wallettransaction.FieldID, wallettransaction.FieldUserID, wallettransaction.FieldOperatorID:
+		case wallettransaction.FieldID, wallettransaction.FieldUserID, wallettransaction.FieldOperatorID, wallettransaction.FieldReversesTransactionID:
 			values[i] = new(sql.NullInt64)
 		case wallettransaction.FieldType, wallettransaction.FieldCurrency, wallettransaction.FieldReferenceType, wallettransaction.FieldReferenceID, wallettransaction.FieldIdempotencyKey, wallettransaction.FieldRequestFingerprint, wallettransaction.FieldSource, wallettransaction.FieldNote:
 			values[i] = new(sql.NullString)
@@ -192,6 +220,13 @@ func (_m *WalletTransaction) assignValues(columns []string, values []any) error 
 				_m.OperatorID = new(int64)
 				*_m.OperatorID = value.Int64
 			}
+		case wallettransaction.FieldReversesTransactionID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field reverses_transaction_id", values[i])
+			} else if value.Valid {
+				_m.ReversesTransactionID = new(int64)
+				*_m.ReversesTransactionID = value.Int64
+			}
 		case wallettransaction.FieldSource:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field source", values[i])
@@ -239,6 +274,16 @@ func (_m *WalletTransaction) QueryUser() *UserQuery {
 // QueryOperator queries the "operator" edge of the WalletTransaction entity.
 func (_m *WalletTransaction) QueryOperator() *UserQuery {
 	return NewWalletTransactionClient(_m.config).QueryOperator(_m)
+}
+
+// QueryRefund queries the "refund" edge of the WalletTransaction entity.
+func (_m *WalletTransaction) QueryRefund() *WalletTransactionQuery {
+	return NewWalletTransactionClient(_m.config).QueryRefund(_m)
+}
+
+// QueryReverses queries the "reverses" edge of the WalletTransaction entity.
+func (_m *WalletTransaction) QueryReverses() *WalletTransactionQuery {
+	return NewWalletTransactionClient(_m.config).QueryReverses(_m)
 }
 
 // Update returns a builder for updating this WalletTransaction.
@@ -296,6 +341,11 @@ func (_m *WalletTransaction) String() string {
 	builder.WriteString(", ")
 	if v := _m.OperatorID; v != nil {
 		builder.WriteString("operator_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.ReversesTransactionID; v != nil {
+		builder.WriteString("reverses_transaction_id=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")

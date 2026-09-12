@@ -13,6 +13,8 @@ vi.mock('@/api/client', () => ({
 import {
   batchUpdateLimits,
   bindUserAuthIdentity,
+  refundUsage,
+  updateBalance,
   type AdminBindAuthIdentityRequest,
   type AdminBoundAuthIdentity,
   type BatchUpdateUserLimitsRequest,
@@ -146,5 +148,41 @@ describe('admin users api auth identity binding', () => {
     expect(result).toEqual({ affected: 2 })
     expect(batchRequestContractExact).toBe(true)
     expect(batchResponseContractExact).toBe(true)
+  })
+
+  it('sends exact wallet strings, audit notes, and stable idempotency headers', async () => {
+    const response = {
+      applied: true,
+      id: 91,
+      user_id: 7,
+      type: 'recharge' as const,
+      amount: '2.50000000',
+      currency: 'CNY' as const,
+      balance_before: '1.25000000',
+      balance_after: '3.75000000',
+      created_at: '2026-09-13T04:00:00Z',
+    }
+    post.mockResolvedValue({ data: response })
+
+    const result = await updateBalance(7, '2.50', 'recharge', 'receipt 42', 'wallet-key-42')
+
+    expect(post).toHaveBeenCalledWith(
+      '/admin/users/7/wallet/transactions',
+      { amount: '2.50', operation: 'recharge', note: 'receipt 42' },
+      { headers: { 'Idempotency-Key': 'wallet-key-42' } }
+    )
+    expect(result).toEqual(response)
+  })
+
+  it('posts a full usage refund by original wallet transaction id', async () => {
+    post.mockResolvedValue({ data: { applied: true } })
+
+    await refundUsage(7, 44, 'approved ticket', 'refund-key-44')
+
+    expect(post).toHaveBeenCalledWith(
+      '/admin/users/7/wallet/refunds',
+      { original_transaction_id: 44, note: 'approved ticket' },
+      { headers: { 'Idempotency-Key': 'refund-key-44' } }
+    )
   })
 })

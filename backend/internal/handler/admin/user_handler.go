@@ -34,6 +34,11 @@ type UserHandler struct {
 	totpService           *service.TotpService                // 角色提升为管理员的 step-up 门控
 	userService           *service.UserService
 	settingService        *service.SettingService // step-up 功能开关
+	walletService         *service.WalletService
+}
+
+func (h *UserHandler) SetWalletService(walletService *service.WalletService) {
+	h.walletService = walletService
 }
 
 // NewUserHandler creates a new admin user handler
@@ -92,9 +97,33 @@ type UpdateUserRequest struct {
 
 // UpdateBalanceRequest represents balance update request
 type UpdateBalanceRequest struct {
-	Balance   float64 `json:"balance" binding:"required,gt=0"`
-	Operation string  `json:"operation" binding:"required,oneof=set add subtract"`
-	Notes     string  `json:"notes"`
+	Amount    string `json:"amount" binding:"required"`
+	Operation string `json:"operation" binding:"required,oneof=recharge adjustment"`
+	Note      string `json:"note" binding:"required"`
+}
+
+type RefundUsageRequest struct {
+	OriginalTransactionID int64  `json:"original_transaction_id" binding:"required,gt=0"`
+	Note                  string `json:"note" binding:"required"`
+}
+
+type walletBalanceResponse struct {
+	UserID   int64  `json:"user_id"`
+	Currency string `json:"currency"`
+	Balance  string `json:"balance"`
+}
+
+type walletTransactionResponse struct {
+	Applied               bool   `json:"applied"`
+	ID                    int64  `json:"id"`
+	UserID                int64  `json:"user_id"`
+	Type                  string `json:"type"`
+	Amount                string `json:"amount"`
+	Currency              string `json:"currency"`
+	BalanceBefore         string `json:"balance_before"`
+	BalanceAfter          string `json:"balance_after"`
+	ReversesTransactionID *int64 `json:"reverses_transaction_id,omitempty"`
+	CreatedAt             string `json:"created_at"`
 }
 
 type BindUserAuthIdentityRequest struct {
@@ -386,7 +415,8 @@ func (h *UserHandler) Delete(c *gin.Context) {
 }
 
 // UpdateBalance handles updating user balance
-// POST /api/v1/admin/users/:id/balance
+// POST /api/v1/admin/users/:id/wallet/transactions
+// The legacy /balance route is retained as a strict string-only alias.
 func (h *UserHandler) UpdateBalance(c *gin.Context) {
 	userID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -408,12 +438,117 @@ func (h *UserHandler) UpdateBalance(c *gin.Context) {
 		Body:   req,
 	}
 	executeAdminIdempotentJSON(c, "admin.users.balance.update", idempotencyPayload, service.DefaultWriteIdempotencyTTL(), func(ctx context.Context) (any, error) {
-		user, execErr := h.adminService.UpdateUserBalance(ctx, userID, req.Balance, req.Operation, req.Notes)
+		if h.walletService == nil {
+			return nil, fmt.Errorf("wallet service unavailable")
+		}
+		input := service.AdminWalletMutationInput{
+			UserID:         userID,
+			Amount:         req.Amount,
+			IdempotencyKey: c.GetHeader("Idempotency-Key"),
+			OperatorID:     getAdminIDFromContext(c),
+			Note:           req.Note,
+		}
+		var result *service.WalletApplyResult
+		var execErr error
+		switch req.Operation {
+		case "recharge":
+			result, execErr = h.walletService.Recharge(ctx, input)
+		case "adjustment":
+			result, execErr = h.walletService.Adjust(ctx, input)
+		default:
+			return nil, fmt.Errorf("unsupported wallet operation: %q", req.Operation)
+		}
 		if execErr != nil {
 			return nil, execErr
 		}
-		return dto.UserFromServiceAdmin(user), nil
+		middleware.SetAuditExtra(c, map[string]any{
+			"target_user_id":        userID,
+			"wallet_transaction_id": result.Transaction.ID,
+			"wallet_operation":      string(result.Transaction.Type),
+			"applied":               result.Applied,
+		})
+		return walletTransactionFromService(result), nil
 	})
+}
+
+// RefundUsage handles a one-time full refund of one negative usage ledger row.
+// POST /api/v1/admin/users/:id/wallet/refunds
+func (h *UserHandler) RefundUsage(c *gin.Context) {
+	userID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid user ID")
+		return
+	}
+	var req RefundUsageRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	payload := struct {
+		UserID int64              `json:"user_id"`
+		Body   RefundUsageRequest `json:"body"`
+	}{UserID: userID, Body: req}
+	executeAdminIdempotentJSON(c, "admin.users.wallet.refund", payload, service.DefaultWriteIdempotencyTTL(), func(ctx context.Context) (any, error) {
+		if h.walletService == nil {
+			return nil, fmt.Errorf("wallet service unavailable")
+		}
+		result, execErr := h.walletService.RefundUsage(ctx, service.AdminWalletRefundInput{
+			UserID:                userID,
+			OriginalTransactionID: req.OriginalTransactionID,
+			IdempotencyKey:        c.GetHeader("Idempotency-Key"),
+			OperatorID:            getAdminIDFromContext(c),
+			Note:                  req.Note,
+		})
+		if execErr != nil {
+			return nil, execErr
+		}
+		middleware.SetAuditExtra(c, map[string]any{
+			"target_user_id":          userID,
+			"wallet_transaction_id":   result.Transaction.ID,
+			"reverses_transaction_id": req.OriginalTransactionID,
+			"applied":                 result.Applied,
+		})
+		return walletTransactionFromService(result), nil
+	})
+}
+
+// GetWallet returns the reconciled CNY balance for one user.
+// GET /api/v1/admin/users/:id/wallet
+func (h *UserHandler) GetWallet(c *gin.Context) {
+	userID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid user ID")
+		return
+	}
+	if h.walletService == nil {
+		response.InternalError(c, "Wallet service unavailable")
+		return
+	}
+	balance, err := h.walletService.GetBalance(c.Request.Context(), userID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, walletBalanceResponse{
+		UserID: balance.UserID, Currency: balance.Currency,
+		Balance: balance.Balance.StringFixed(service.WalletAmountScale),
+	})
+}
+
+func walletTransactionFromService(result *service.WalletApplyResult) walletTransactionResponse {
+	transaction := result.Transaction
+	return walletTransactionResponse{
+		Applied:               result.Applied,
+		ID:                    transaction.ID,
+		UserID:                transaction.UserID,
+		Type:                  string(transaction.Type),
+		Amount:                transaction.Amount.StringFixed(service.WalletAmountScale),
+		Currency:              transaction.Currency,
+		BalanceBefore:         transaction.BalanceBefore.StringFixed(service.WalletAmountScale),
+		BalanceAfter:          transaction.BalanceAfter.StringFixed(service.WalletAmountScale),
+		ReversesTransactionID: transaction.ReversesTransactionID,
+		CreatedAt:             transaction.CreatedAt.UTC().Format(time.RFC3339Nano),
+	}
 }
 
 // GetUserAPIKeys handles getting user's API keys

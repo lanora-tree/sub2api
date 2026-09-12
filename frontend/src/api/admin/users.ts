@@ -55,6 +55,25 @@ export interface BatchUpdateUserLimitsResponse {
   affected: number
 }
 
+export interface WalletBalanceResponse {
+  user_id: number
+  currency: 'CNY'
+  balance: string
+}
+
+export interface WalletTransactionResponse {
+  applied: boolean
+  id: number
+  user_id: number
+  type: 'recharge' | 'refund' | 'adjustment'
+  amount: string
+  currency: 'CNY'
+  balance_before: string
+  balance_after: string
+  reverses_transaction_id?: number
+  created_at: string
+}
+
 /**
  * List all users with pagination
  * @param page - Page number (default: 1)
@@ -133,7 +152,6 @@ export async function create(userData: {
   username?: string
   notes?: string
   role?: 'admin' | 'user'
-  balance?: number
   concurrency?: number
   rpm_limit?: number
   allowed_groups?: number[] | null
@@ -166,22 +184,45 @@ export async function deleteUser(id: number): Promise<{ message: string }> {
 /**
  * Update user balance
  * @param id - User ID
- * @param balance - New balance
- * @param operation - Operation type ('set', 'add', 'subtract')
- * @param notes - Optional notes for the balance adjustment
- * @returns Updated user
+ * @param amount - Exact decimal string. Recharge supports 2 fractional digits;
+ * adjustment supports 8 and may be negative.
+ * @param operation - Audited wallet operation type
+ * @param note - Required audit note
+ * @param idempotencyKey - Stable key retained by the UI across retries
  */
 export async function updateBalance(
   id: number,
-  balance: number,
-  operation: 'set' | 'add' | 'subtract' = 'set',
-  notes?: string
-): Promise<AdminUser> {
-  const { data } = await apiClient.post<AdminUser>(`/admin/users/${id}/balance`, {
-    balance,
+  amount: string,
+  operation: 'recharge' | 'adjustment',
+  note: string,
+  idempotencyKey: string
+): Promise<WalletTransactionResponse> {
+  const { data } = await apiClient.post<WalletTransactionResponse>(`/admin/users/${id}/wallet/transactions`, {
+    amount,
     operation,
-    notes: notes || ''
+    note
+  }, {
+    headers: { 'Idempotency-Key': idempotencyKey }
   })
+  return data
+}
+
+export async function refundUsage(
+  id: number,
+  originalTransactionId: number,
+  note: string,
+  idempotencyKey: string
+): Promise<WalletTransactionResponse> {
+  const { data } = await apiClient.post<WalletTransactionResponse>(
+    `/admin/users/${id}/wallet/refunds`,
+    { original_transaction_id: originalTransactionId, note },
+    { headers: { 'Idempotency-Key': idempotencyKey } }
+  )
+  return data
+}
+
+export async function getWallet(id: number): Promise<WalletBalanceResponse> {
+  const { data } = await apiClient.get<WalletBalanceResponse>(`/admin/users/${id}/wallet`)
   return data
 }
 
@@ -406,6 +447,8 @@ export const usersAPI = {
   update,
   delete: deleteUser,
   updateBalance,
+  refundUsage,
+  getWallet,
   updateConcurrency,
   batchUpdateLimits,
   toggleStatus,

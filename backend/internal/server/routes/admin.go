@@ -44,7 +44,7 @@ func RegisterAdminRoutes(
 		registerDashboardRoutes(admin, h)
 
 		// 用户管理
-		registerUserManagementRoutes(admin, h)
+		registerUserManagementRoutes(admin, h, stepUpAuth)
 
 		// 分组管理
 		registerGroupRoutes(admin, h)
@@ -303,7 +303,7 @@ func registerDashboardRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	}
 }
 
-func registerUserManagementRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+func registerUserManagementRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAuth middleware.StepUpAuthMiddleware) {
 	users := admin.Group("/users")
 	{
 		users.GET("", h.Admin.User.List)
@@ -312,7 +312,10 @@ func registerUserManagementRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		users.POST("", h.Admin.User.Create)
 		users.PUT("/:id", h.Admin.User.Update)
 		users.DELETE("/:id", h.Admin.User.Delete)
-		users.POST("/:id/balance", h.Admin.User.UpdateBalance)
+		users.POST("/:id/balance", gin.HandlerFunc(stepUpAuth), h.Admin.User.UpdateBalance)
+		users.GET("/:id/wallet", h.Admin.User.GetWallet)
+		users.POST("/:id/wallet/transactions", gin.HandlerFunc(stepUpAuth), h.Admin.User.UpdateBalance)
+		users.POST("/:id/wallet/refunds", gin.HandlerFunc(stepUpAuth), h.Admin.User.RefundUsage)
 		users.GET("/:id/api-keys", h.Admin.User.GetUserAPIKeys)
 		users.GET("/:id/usage", h.Admin.User.GetUserUsage)
 		users.GET("/:id/balance-history", h.Admin.User.GetBalanceHistory)

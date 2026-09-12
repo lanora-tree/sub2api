@@ -37,6 +37,8 @@ const (
 	FieldRequestFingerprint = "request_fingerprint"
 	// FieldOperatorID holds the string denoting the operator_id field in the database.
 	FieldOperatorID = "operator_id"
+	// FieldReversesTransactionID holds the string denoting the reverses_transaction_id field in the database.
+	FieldReversesTransactionID = "reverses_transaction_id"
 	// FieldSource holds the string denoting the source field in the database.
 	FieldSource = "source"
 	// FieldNote holds the string denoting the note field in the database.
@@ -49,6 +51,10 @@ const (
 	EdgeUser = "user"
 	// EdgeOperator holds the string denoting the operator edge name in mutations.
 	EdgeOperator = "operator"
+	// EdgeRefund holds the string denoting the refund edge name in mutations.
+	EdgeRefund = "refund"
+	// EdgeReverses holds the string denoting the reverses edge name in mutations.
+	EdgeReverses = "reverses"
 	// Table holds the table name of the wallettransaction in the database.
 	Table = "wallet_transactions"
 	// UserTable is the table that holds the user relation/edge.
@@ -65,6 +71,14 @@ const (
 	OperatorInverseTable = "users"
 	// OperatorColumn is the table column denoting the operator relation/edge.
 	OperatorColumn = "operator_id"
+	// RefundTable is the table that holds the refund relation/edge.
+	RefundTable = "wallet_transactions"
+	// RefundColumn is the table column denoting the refund relation/edge.
+	RefundColumn = "reverses_transaction_id"
+	// ReversesTable is the table that holds the reverses relation/edge.
+	ReversesTable = "wallet_transactions"
+	// ReversesColumn is the table column denoting the reverses relation/edge.
+	ReversesColumn = "reverses_transaction_id"
 )
 
 // Columns holds all SQL columns for wallettransaction fields.
@@ -81,6 +95,7 @@ var Columns = []string{
 	FieldIdempotencyKey,
 	FieldRequestFingerprint,
 	FieldOperatorID,
+	FieldReversesTransactionID,
 	FieldSource,
 	FieldNote,
 	FieldMetadata,
@@ -210,6 +225,11 @@ func ByOperatorID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldOperatorID, opts...).ToFunc()
 }
 
+// ByReversesTransactionID orders the results by the reverses_transaction_id field.
+func ByReversesTransactionID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldReversesTransactionID, opts...).ToFunc()
+}
+
 // BySource orders the results by the source field.
 func BySource(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSource, opts...).ToFunc()
@@ -238,6 +258,20 @@ func ByOperatorField(field string, opts ...sql.OrderTermOption) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newOperatorStep(), sql.OrderByField(field, opts...))
 	}
 }
+
+// ByRefundField orders the results by refund field.
+func ByRefundField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newRefundStep(), sql.OrderByField(field, opts...))
+	}
+}
+
+// ByReversesField orders the results by reverses field.
+func ByReversesField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newReversesStep(), sql.OrderByField(field, opts...))
+	}
+}
 func newUserStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -250,5 +284,19 @@ func newOperatorStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(OperatorInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, OperatorTable, OperatorColumn),
+	)
+}
+func newRefundStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(Table, FieldID),
+		sqlgraph.Edge(sqlgraph.O2O, false, RefundTable, RefundColumn),
+	)
+}
+func newReversesStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(Table, FieldID),
+		sqlgraph.Edge(sqlgraph.O2O, true, ReversesTable, ReversesColumn),
 	)
 }

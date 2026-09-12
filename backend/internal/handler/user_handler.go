@@ -22,6 +22,35 @@ type UserHandler struct {
 	emailCache            service.EmailCache
 	affiliateService      *service.AffiliateService
 	userPlatformQuotaRepo service.UserPlatformQuotaRepository
+	walletService         *service.WalletService
+}
+
+func (h *UserHandler) SetWalletService(walletService *service.WalletService) {
+	h.walletService = walletService
+}
+
+// GetWallet returns only the authenticated user's reconciled CNY balance.
+// GET /api/v1/user/wallet
+func (h *UserHandler) GetWallet(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+	if h.walletService == nil {
+		response.InternalError(c, "Wallet service unavailable")
+		return
+	}
+	balance, err := h.walletService.GetBalance(c.Request.Context(), subject.UserID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{
+		"user_id":  balance.UserID,
+		"currency": balance.Currency,
+		"balance":  balance.Balance.StringFixed(service.WalletAmountScale),
+	})
 }
 
 // NewUserHandler creates a new UserHandler

@@ -33,42 +33,47 @@ var (
 	ErrWalletIdempotencyConflict = errors.New("wallet idempotency key reused with different request")
 	ErrWalletUserNotFound        = errors.New("wallet user not found")
 	ErrWalletInsufficientBalance = errors.New("wallet balance would become negative")
+	ErrWalletTransactionNotFound = errors.New("wallet transaction not found")
+	ErrWalletRefundTargetInvalid = errors.New("wallet refund target must be a negative usage transaction for the same user")
+	ErrWalletAlreadyRefunded     = errors.New("wallet usage transaction already refunded")
 )
 
 // WalletMutation is one requested change to the CNY balance. Amount is signed:
 // recharge/refund are positive, usage is negative, and adjustment can be either.
 type WalletMutation struct {
-	UserID               int64
-	Type                 WalletTransactionType
-	Amount               decimal.Decimal
-	Currency             string
-	ReferenceType        string
-	ReferenceID          string
-	IdempotencyKey       string
-	OperatorID           *int64
-	Source               string
-	Note                 string
-	Metadata             map[string]any
-	AllowNegativeBalance bool
+	UserID                int64
+	Type                  WalletTransactionType
+	Amount                decimal.Decimal
+	Currency              string
+	ReferenceType         string
+	ReferenceID           string
+	IdempotencyKey        string
+	OperatorID            *int64
+	ReversesTransactionID *int64
+	Source                string
+	Note                  string
+	Metadata              map[string]any
+	AllowNegativeBalance  bool
 }
 
 type WalletTransaction struct {
-	ID                 int64
-	UserID             int64
-	Type               WalletTransactionType
-	Amount             decimal.Decimal
-	Currency           string
-	BalanceBefore      decimal.Decimal
-	BalanceAfter       decimal.Decimal
-	ReferenceType      string
-	ReferenceID        string
-	IdempotencyKey     string
-	RequestFingerprint string
-	OperatorID         *int64
-	Source             string
-	Note               string
-	Metadata           map[string]any
-	CreatedAt          time.Time
+	ID                    int64
+	UserID                int64
+	Type                  WalletTransactionType
+	Amount                decimal.Decimal
+	Currency              string
+	BalanceBefore         decimal.Decimal
+	BalanceAfter          decimal.Decimal
+	ReferenceType         string
+	ReferenceID           string
+	IdempotencyKey        string
+	RequestFingerprint    string
+	OperatorID            *int64
+	ReversesTransactionID *int64
+	Source                string
+	Note                  string
+	Metadata              map[string]any
+	CreatedAt             time.Time
 }
 
 type WalletApplyResult struct {
@@ -85,22 +90,24 @@ type WalletReconciliation struct {
 
 type WalletRepository interface {
 	Apply(ctx context.Context, cmd *WalletMutation) (*WalletApplyResult, error)
+	GetTransaction(ctx context.Context, transactionID int64) (*WalletTransaction, error)
 	ReconcileUser(ctx context.Context, userID int64) (*WalletReconciliation, error)
 }
 
 type walletFingerprintPayload struct {
-	UserID               int64                 `json:"user_id"`
-	Type                 WalletTransactionType `json:"type"`
-	Amount               string                `json:"amount"`
-	Currency             string                `json:"currency"`
-	ReferenceType        string                `json:"reference_type"`
-	ReferenceID          string                `json:"reference_id"`
-	IdempotencyKey       string                `json:"idempotency_key"`
-	OperatorID           *int64                `json:"operator_id"`
-	Source               string                `json:"source"`
-	Note                 string                `json:"note"`
-	Metadata             json.RawMessage       `json:"metadata"`
-	AllowNegativeBalance bool                  `json:"allow_negative_balance"`
+	UserID                int64                 `json:"user_id"`
+	Type                  WalletTransactionType `json:"type"`
+	Amount                string                `json:"amount"`
+	Currency              string                `json:"currency"`
+	ReferenceType         string                `json:"reference_type"`
+	ReferenceID           string                `json:"reference_id"`
+	IdempotencyKey        string                `json:"idempotency_key"`
+	OperatorID            *int64                `json:"operator_id"`
+	ReversesTransactionID *int64                `json:"reverses_transaction_id"`
+	Source                string                `json:"source"`
+	Note                  string                `json:"note"`
+	Metadata              json.RawMessage       `json:"metadata"`
+	AllowNegativeBalance  bool                  `json:"allow_negative_balance"`
 }
 
 // PrepareWalletMutation normalizes and validates a mutation, then produces the
@@ -124,6 +131,10 @@ func PrepareWalletMutation(cmd *WalletMutation) (*WalletMutation, []byte, string
 		operatorID := *prepared.OperatorID
 		prepared.OperatorID = &operatorID
 	}
+	if prepared.ReversesTransactionID != nil {
+		reversesID := *prepared.ReversesTransactionID
+		prepared.ReversesTransactionID = &reversesID
+	}
 
 	if err := validateWalletMutation(&prepared); err != nil {
 		return nil, nil, "", err
@@ -146,18 +157,19 @@ func PrepareWalletMutation(cmd *WalletMutation) (*WalletMutation, []byte, string
 	}
 
 	payload, err := json.Marshal(walletFingerprintPayload{
-		UserID:               prepared.UserID,
-		Type:                 prepared.Type,
-		Amount:               prepared.Amount.StringFixed(WalletAmountScale),
-		Currency:             prepared.Currency,
-		ReferenceType:        prepared.ReferenceType,
-		ReferenceID:          prepared.ReferenceID,
-		IdempotencyKey:       prepared.IdempotencyKey,
-		OperatorID:           prepared.OperatorID,
-		Source:               prepared.Source,
-		Note:                 prepared.Note,
-		Metadata:             metadataJSON,
-		AllowNegativeBalance: prepared.AllowNegativeBalance,
+		UserID:                prepared.UserID,
+		Type:                  prepared.Type,
+		Amount:                prepared.Amount.StringFixed(WalletAmountScale),
+		Currency:              prepared.Currency,
+		ReferenceType:         prepared.ReferenceType,
+		ReferenceID:           prepared.ReferenceID,
+		IdempotencyKey:        prepared.IdempotencyKey,
+		OperatorID:            prepared.OperatorID,
+		ReversesTransactionID: prepared.ReversesTransactionID,
+		Source:                prepared.Source,
+		Note:                  prepared.Note,
+		Metadata:              metadataJSON,
+		AllowNegativeBalance:  prepared.AllowNegativeBalance,
 	})
 	if err != nil {
 		return nil, nil, "", fmt.Errorf("%w: fingerprint: %v", ErrWalletInvalidMutation, err)
@@ -172,6 +184,9 @@ func validateWalletMutation(cmd *WalletMutation) error {
 	}
 	if cmd.OperatorID != nil && *cmd.OperatorID <= 0 {
 		return fmt.Errorf("%w: operator_id must be positive", ErrWalletInvalidMutation)
+	}
+	if cmd.ReversesTransactionID != nil && *cmd.ReversesTransactionID <= 0 {
+		return fmt.Errorf("%w: reverses_transaction_id must be positive", ErrWalletInvalidMutation)
 	}
 	if cmd.Currency != WalletCurrencyCNY {
 		return fmt.Errorf("%w: currency must be CNY", ErrWalletInvalidMutation)
@@ -194,6 +209,13 @@ func validateWalletMutation(cmd *WalletMutation) error {
 		}
 	default:
 		return fmt.Errorf("%w: unsupported transaction type", ErrWalletInvalidMutation)
+	}
+	if cmd.Type == WalletTransactionRefund {
+		if cmd.ReversesTransactionID == nil {
+			return fmt.Errorf("%w: refund requires reverses_transaction_id", ErrWalletInvalidMutation)
+		}
+	} else if cmd.ReversesTransactionID != nil {
+		return fmt.Errorf("%w: only refund may set reverses_transaction_id", ErrWalletInvalidMutation)
 	}
 
 	for _, value := range []struct {

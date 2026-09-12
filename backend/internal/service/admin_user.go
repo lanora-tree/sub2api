@@ -19,6 +19,18 @@ import (
 )
 
 // User management implementations
+
+var (
+	ErrAdminInitialBalanceUnsupported = infraerrors.BadRequest(
+		"WALLET_INITIAL_BALANCE_UNSUPPORTED",
+		"new users must start with zero balance; use an audited wallet recharge after creation",
+	)
+	ErrAdminBalanceFieldUnsupported = infraerrors.BadRequest(
+		"WALLET_BALANCE_FIELD_UNSUPPORTED",
+		"balance cannot be changed through the generic user update; use an audited wallet transaction",
+	)
+)
+
 func (s *adminServiceImpl) ListUsers(ctx context.Context, page, pageSize int, filters UserListFilters, sortBy, sortOrder string) ([]User, int64, error) {
 	params := pagination.PaginationParams{Page: page, PageSize: pageSize, SortBy: sortBy, SortOrder: sortOrder}
 	users, result, err := s.userRepo.ListWithFilters(ctx, params, filters)
@@ -118,11 +130,8 @@ func normalizeUserRole(role, fallback string) (string, error) {
 }
 
 func (s *adminServiceImpl) CreateUser(ctx context.Context, input *CreateUserInput) (*User, error) {
-	balance := 0.0
-	if input.Balance != nil {
-		balance = *input.Balance
-	} else if s.settingService != nil {
-		balance = s.settingService.GetDefaultBalance(ctx)
+	if input.Balance != nil && *input.Balance != 0 {
+		return nil, ErrAdminInitialBalanceUnsupported
 	}
 
 	// 角色可由管理员在创建时指定(admin/user);未提供时默认 user。
@@ -136,7 +145,7 @@ func (s *adminServiceImpl) CreateUser(ctx context.Context, input *CreateUserInpu
 		Username:      input.Username,
 		Notes:         input.Notes,
 		Role:          role,
-		Balance:       balance,
+		Balance:       0,
 		Concurrency:   input.Concurrency,
 		RPMLimit:      input.RPMLimit,
 		Status:        StatusActive,
@@ -195,6 +204,9 @@ func (s *adminServiceImpl) assignDefaultSubscriptions(ctx context.Context, userI
 }
 
 func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *UpdateUserInput) (*User, error) {
+	if input.Balance != nil {
+		return nil, ErrAdminBalanceFieldUnsupported
+	}
 	// 校验用户专属分组倍率：必须 > 0（nil 合法，表示清除专属倍率）
 	if input.GroupRates != nil {
 		for groupID, rate := range input.GroupRates {
@@ -511,94 +523,6 @@ func (s *adminServiceImpl) BatchUpdateLimits(ctx context.Context, userIDs []int6
 		}
 	}
 	return affected, nil
-}
-
-func (s *adminServiceImpl) UpdateUserBalance(ctx context.Context, userID int64, balance float64, operation string, notes string) (*User, error) {
-	// 余额调整必须走原子接口：先读后整行写回会把并发的计费扣款覆盖掉。
-	var (
-		change BalanceChange
-		err    error
-	)
-	switch operation {
-	case "set":
-		change, err = s.userRepo.SetBalance(ctx, userID, balance)
-	case "add":
-		change, err = s.userRepo.AdjustBalance(ctx, userID, balance)
-	case "subtract":
-		change, err = s.userRepo.AdjustBalance(ctx, userID, -balance)
-	default:
-		return nil, fmt.Errorf("unsupported balance operation: %q", operation)
-	}
-	if errors.Is(err, ErrBalanceNegative) {
-		return nil, fmt.Errorf("balance cannot be negative, current balance: %.2f, requested operation would result in: %.2f", change.Old, change.New)
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	user, err := s.userRepo.GetByID(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-
-	balanceDiff := change.New - change.Old
-	if s.authCacheInvalidator != nil && balanceDiff != 0 {
-		s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, userID)
-	}
-	s.tryAccrueAffiliateRebateForAdminRecharge(ctx, userID, operation, balance)
-
-	if s.billingCacheService != nil {
-		go func() {
-			cacheCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			if err := s.billingCacheService.InvalidateUserBalance(cacheCtx, userID); err != nil {
-				logger.LegacyPrintf("service.admin", "invalidate user balance cache failed: user_id=%d err=%v", userID, err)
-			}
-		}()
-	}
-
-	if balanceDiff != 0 {
-		code, err := GenerateRedeemCode()
-		if err != nil {
-			logger.LegacyPrintf("service.admin", "failed to generate adjustment redeem code: %v", err)
-			return user, nil
-		}
-
-		adjustmentRecord := &RedeemCode{
-			Code:   code,
-			Type:   AdjustmentTypeAdminBalance,
-			Value:  balanceDiff,
-			Status: StatusUsed,
-			UsedBy: &user.ID,
-			Notes:  notes,
-		}
-		now := time.Now()
-		adjustmentRecord.UsedAt = &now
-
-		if err := s.redeemCodeRepo.Create(ctx, adjustmentRecord); err != nil {
-			logger.LegacyPrintf("service.admin", "failed to create balance adjustment redeem code: %v", err)
-		}
-	}
-
-	return user, nil
-}
-
-func (s *adminServiceImpl) tryAccrueAffiliateRebateForAdminRecharge(ctx context.Context, userID int64, operation string, amount float64) {
-	if operation != "add" || amount <= 0 || s.settingService == nil || s.affiliateService == nil {
-		return
-	}
-	if !s.settingService.IsAffiliateAdminRechargeEnabled(ctx) {
-		return
-	}
-
-	rebate, err := s.affiliateService.AccrueInviteRebate(ctx, userID, amount)
-	if err != nil {
-		logger.LegacyPrintf("service.admin", "affiliate rebate failed for admin recharge: user_id=%d amount=%.8f err=%v", userID, amount, err)
-		return
-	}
-	if rebate > 0 {
-		logger.LegacyPrintf("service.admin", "affiliate rebate accrued for admin recharge: user_id=%d amount=%.8f rebate=%.8f", userID, amount, rebate)
-	}
 }
 
 func (s *adminServiceImpl) GetUserAPIKeys(ctx context.Context, userID int64, page, pageSize int, sortBy, sortOrder string) ([]APIKey, int64, error) {

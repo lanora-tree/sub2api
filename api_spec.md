@@ -188,7 +188,16 @@ Authorization: Bearer jwt_access_token
 }
 ```
 
-新增：
+M6.2 先提供独立且已实现的精确余额查询；服务端只使用 JWT subject，不接受调用者提供的 User ID：
+
+```http
+GET /api/v1/user/wallet
+Authorization: Bearer jwt_access_token
+```
+
+响应中的 `balance` 为八位定点十进制字符串，`currency` 固定为 `CNY`。Profile 内嵌 wallet 和下面的流水列表仍是后续 Portal/API 收口项。
+
+计划新增：
 
 ```http
 GET /api/v1/user/wallet/transactions?page=1&page_size=20&type=usage
@@ -291,13 +300,13 @@ Idempotency-Key: admin-operation-unique-id
 
 ```json
 {
-  "type": "recharge",
+  "operation": "recharge",
   "amount": "100.00",
   "note": "课题组 9 月额度"
 }
 ```
 
-`amount` 对 recharge、refund 为正。adjustment 可以为正或负。管理员负向调账不得使余额小于零。
+`operation` 只允许 `recharge` 或 `adjustment`。充值金额为正且最多两位小数；调账金额为非零有符号值且最多八位小数。管理员负向调账不得使余额小于零。所有写操作要求非空 `Idempotency-Key`、非空 note 和管理员 subject；启用 step-up 时必须使用近期通过 TOTP 的管理员 JWT，Admin API Key 会被拒绝。
 
 响应：
 
@@ -305,8 +314,9 @@ Idempotency-Key: admin-operation-unique-id
 {
   "success": true,
   "data": {
-    "transaction_id": "9001",
-    "user_id": "42",
+    "applied": true,
+    "id": 9001,
+    "user_id": 42,
     "type": "recharge",
     "amount": "100.00000000",
     "balance_before": "0.00000000",
@@ -317,7 +327,23 @@ Idempotency-Key: admin-operation-unique-id
 }
 ```
 
-同一 `Idempotency-Key` 和相同 body 返回原结果。Key 相同且 body 不同返回 409 `IDEMPOTENCY_CONFLICT`。
+同一 `Idempotency-Key` 和相同 body 返回原业务结果，不产生第二条流水；Key 相同且 body 不同返回 409。`applied` 表示本次 Wallet Service 执行是否新建流水，外层幂等协调器直接重放已保存 HTTP 响应时该字段保持原响应值。余额查询使用 `GET /api/v1/admin/users/{id}/wallet`。
+
+一次性全额 usage 退款使用独立端点，退款金额只由服务端从原负数 CNY usage 流水派生：
+
+```http
+POST /api/v1/admin/users/{id}/wallet/refunds
+Authorization: Bearer admin_jwt
+Idempotency-Key: admin-refund-unique-id
+Content-Type: application/json
+
+{
+  "original_transaction_id": 9000,
+  "note": "工单 CM-124 已批准"
+}
+```
+
+数据库自引用和部分唯一索引保证同一 usage 即使换用不同请求键也只能退款一次；不提供任意金额 refund 写入口。
 
 ### 5.2 用户模型权限
 

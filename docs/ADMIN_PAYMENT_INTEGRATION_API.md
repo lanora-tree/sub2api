@@ -6,6 +6,8 @@
 
 ## 中文
 
+> V1 安全提示：M2 已关闭旧支付、兑换码和外部回调能力。本文件中的服务间充值流程在 M8 安全 Internal Recharge API 完成前不得用于真实资金；M6.2 的钱包写接口仅供受审计的管理员人工操作。
+
 ### 目标
 本文档用于对接外部支付系统（如 `sub2apipay`）与 Sub2API 的 Admin API，覆盖：
 - 支付成功后充值
@@ -73,31 +75,35 @@ curl -s "${BASE}/api/v1/admin/users/123" \
   -H "x-api-key: ${KEY}"
 ```
 
-### 3) 余额调整（已有接口）
-`POST /api/v1/admin/users/:id/balance`
+### 3) 管理员钱包操作（M6.2）
+`POST /api/v1/admin/users/:id/wallet/transactions`
 
-用途：人工补偿 / 扣减，支持 `set` / `add` / `subtract`。
+用途：人工充值或正负调账。`amount` 必须是字符串；`recharge` 为正数且最多两位小数，`adjustment` 为非零有符号数且最多八位小数。`note` 必填，负调账不能使余额小于零。不再支持无流水的 `set`。
 
-请求体示例（扣减）：
+请求体示例（扣减调账）：
 ```json
 {
-  "balance": 100.0,
-  "operation": "subtract",
-  "notes": "manual correction"
+  "amount": "-100.00",
+  "operation": "adjustment",
+  "note": "support ticket CM-123"
 }
 ```
 
 ```bash
-curl -X POST "${BASE}/api/v1/admin/users/123/balance" \
-  -H "x-api-key: ${KEY}" \
+curl -X POST "${BASE}/api/v1/admin/users/123/wallet/transactions" \
+  -H "Authorization: Bearer ${ADMIN_JWT}" \
   -H "Idempotency-Key: balance-subtract-cm1234567890" \
   -H "Content-Type: application/json" \
   -d '{
-    "balance":100.00,
-    "operation":"subtract",
-    "notes":"manual correction"
+    "amount":"-100.00",
+    "operation":"adjustment",
+    "note":"support ticket CM-123"
   }'
 ```
+
+启用 step-up 时，写操作必须使用近期完成 TOTP 二次验证的管理员 JWT；Admin API Key 会被拒绝。旧 `/balance` 路径仅保留为相同严格契约的兼容别名。
+
+余额查询：`GET /api/v1/admin/users/:id/wallet`。一次性全额 usage 退款：`POST /api/v1/admin/users/:id/wallet/refunds`，请求体为 `{"original_transaction_id":44,"note":"approved ticket CM-124"}`，同样要求 `Idempotency-Key`。普通用户只能查询 `GET /api/v1/user/wallet`，服务端忽略任何外部 user ID。
 
 ### 4) 购买页 / 自定义页面 URL Query 透传（iframe / 新窗口一致）
 当 Sub2API 打开 `purchase_subscription_url` 或用户侧自定义页面 iframe URL 时，会统一追加：
@@ -125,6 +131,8 @@ https://pay.example.com/pay?user_id=123&token=<jwt>&theme=light&lang=zh&ui_mode=
 ---
 
 ## English
+
+> V1 security note: M2 disables the legacy payment, redeem-code, and external callback surfaces. Do not use the server-to-server funding flow in this document for real funds until the M8 Internal Recharge API is complete. The M6.2 wallet write endpoints are for audited manual administrator actions only.
 
 ### Purpose
 This document describes the minimal Sub2API Admin API surface for external payment integrations (for example, `sub2apipay`), including:
@@ -193,31 +201,35 @@ curl -s "${BASE}/api/v1/admin/users/123" \
   -H "x-api-key: ${KEY}"
 ```
 
-### 3) Balance Adjustment (existing API)
-`POST /api/v1/admin/users/:id/balance`
+### 3) Administrator wallet operations (M6.2)
+`POST /api/v1/admin/users/:id/wallet/transactions`
 
-Use case: manual correction with `set` / `add` / `subtract`.
+Use case: manual recharge or signed adjustment. `amount` must be a string. A `recharge` is positive with at most two fractional digits; an `adjustment` is non-zero, signed, and supports up to eight fractional digits. `note` is required, and a negative adjustment cannot make the balance negative. Unledgered `set` is no longer supported.
 
-Request body example (`subtract`):
+Request body example (negative adjustment):
 ```json
 {
-  "balance": 100.0,
-  "operation": "subtract",
-  "notes": "manual correction"
+  "amount": "-100.00",
+  "operation": "adjustment",
+  "note": "support ticket CM-123"
 }
 ```
 
 ```bash
-curl -X POST "${BASE}/api/v1/admin/users/123/balance" \
-  -H "x-api-key: ${KEY}" \
+curl -X POST "${BASE}/api/v1/admin/users/123/wallet/transactions" \
+  -H "Authorization: Bearer ${ADMIN_JWT}" \
   -H "Idempotency-Key: balance-subtract-cm1234567890" \
   -H "Content-Type: application/json" \
   -d '{
-    "balance":100.00,
-    "operation":"subtract",
-    "notes":"manual correction"
+    "amount":"-100.00",
+    "operation":"adjustment",
+    "note":"support ticket CM-123"
   }'
 ```
+
+When step-up is enabled, writes require an administrator JWT with a recent TOTP grant; an Admin API Key is rejected. The old `/balance` path remains only as a compatibility alias with the same strict contract.
+
+Balance query: `GET /api/v1/admin/users/:id/wallet`. One-time full usage refund: `POST /api/v1/admin/users/:id/wallet/refunds` with `{"original_transaction_id":44,"note":"approved ticket CM-124"}` and an `Idempotency-Key`. A normal user can only query `GET /api/v1/user/wallet`; the server ignores any caller-supplied user ID.
 
 ### 4) Purchase / Custom Page URL query forwarding (iframe and new tab)
 When Sub2API opens `purchase_subscription_url` or a user-facing custom page iframe URL, it appends:

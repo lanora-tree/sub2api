@@ -106,6 +106,11 @@ func OperatorID(v int64) predicate.WalletTransaction {
 	return predicate.WalletTransaction(sql.FieldEQ(FieldOperatorID, v))
 }
 
+// ReversesTransactionID applies equality check predicate on the "reverses_transaction_id" field. It's identical to ReversesTransactionIDEQ.
+func ReversesTransactionID(v int64) predicate.WalletTransaction {
+	return predicate.WalletTransaction(sql.FieldEQ(FieldReversesTransactionID, v))
+}
+
 // Source applies equality check predicate on the "source" field. It's identical to SourceEQ.
 func Source(v string) predicate.WalletTransaction {
 	return predicate.WalletTransaction(sql.FieldEQ(FieldSource, v))
@@ -636,6 +641,36 @@ func OperatorIDNotNil() predicate.WalletTransaction {
 	return predicate.WalletTransaction(sql.FieldNotNull(FieldOperatorID))
 }
 
+// ReversesTransactionIDEQ applies the EQ predicate on the "reverses_transaction_id" field.
+func ReversesTransactionIDEQ(v int64) predicate.WalletTransaction {
+	return predicate.WalletTransaction(sql.FieldEQ(FieldReversesTransactionID, v))
+}
+
+// ReversesTransactionIDNEQ applies the NEQ predicate on the "reverses_transaction_id" field.
+func ReversesTransactionIDNEQ(v int64) predicate.WalletTransaction {
+	return predicate.WalletTransaction(sql.FieldNEQ(FieldReversesTransactionID, v))
+}
+
+// ReversesTransactionIDIn applies the In predicate on the "reverses_transaction_id" field.
+func ReversesTransactionIDIn(vs ...int64) predicate.WalletTransaction {
+	return predicate.WalletTransaction(sql.FieldIn(FieldReversesTransactionID, vs...))
+}
+
+// ReversesTransactionIDNotIn applies the NotIn predicate on the "reverses_transaction_id" field.
+func ReversesTransactionIDNotIn(vs ...int64) predicate.WalletTransaction {
+	return predicate.WalletTransaction(sql.FieldNotIn(FieldReversesTransactionID, vs...))
+}
+
+// ReversesTransactionIDIsNil applies the IsNil predicate on the "reverses_transaction_id" field.
+func ReversesTransactionIDIsNil() predicate.WalletTransaction {
+	return predicate.WalletTransaction(sql.FieldIsNull(FieldReversesTransactionID))
+}
+
+// ReversesTransactionIDNotNil applies the NotNil predicate on the "reverses_transaction_id" field.
+func ReversesTransactionIDNotNil() predicate.WalletTransaction {
+	return predicate.WalletTransaction(sql.FieldNotNull(FieldReversesTransactionID))
+}
+
 // SourceEQ applies the EQ predicate on the "source" field.
 func SourceEQ(v string) predicate.WalletTransaction {
 	return predicate.WalletTransaction(sql.FieldEQ(FieldSource, v))
@@ -844,6 +879,52 @@ func HasOperator() predicate.WalletTransaction {
 func HasOperatorWith(preds ...predicate.User) predicate.WalletTransaction {
 	return predicate.WalletTransaction(func(s *sql.Selector) {
 		step := newOperatorStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasRefund applies the HasEdge predicate on the "refund" edge.
+func HasRefund() predicate.WalletTransaction {
+	return predicate.WalletTransaction(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, false, RefundTable, RefundColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasRefundWith applies the HasEdge predicate on the "refund" edge with a given conditions (other predicates).
+func HasRefundWith(preds ...predicate.WalletTransaction) predicate.WalletTransaction {
+	return predicate.WalletTransaction(func(s *sql.Selector) {
+		step := newRefundStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasReverses applies the HasEdge predicate on the "reverses" edge.
+func HasReverses() predicate.WalletTransaction {
+	return predicate.WalletTransaction(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, true, ReversesTable, ReversesColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasReversesWith applies the HasEdge predicate on the "reverses" edge with a given conditions (other predicates).
+func HasReversesWith(preds ...predicate.WalletTransaction) predicate.WalletTransaction {
+	return predicate.WalletTransaction(func(s *sql.Selector) {
+		step := newReversesStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

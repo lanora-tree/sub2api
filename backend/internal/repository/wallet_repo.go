@@ -68,6 +68,15 @@ func (r *walletRepository) applyInTx(ctx context.Context, tx *sql.Tx, cmd *servi
 		return nil, err
 	}
 
+	if prepared.Type == service.WalletTransactionRefund {
+		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, fmt.Sprintf("wallet-refund:%d", *prepared.ReversesTransactionID)); err != nil {
+			return nil, err
+		}
+		if err := validateWalletRefundTarget(ctx, tx, prepared); err != nil {
+			return nil, err
+		}
+	}
+
 	var beforeRaw string
 	if err := tx.QueryRowContext(ctx, `
 		SELECT balance::text
@@ -101,29 +110,30 @@ func (r *walletRepository) applyInTx(ctx context.Context, tx *sql.Tx, cmd *servi
 	}
 
 	entry := &service.WalletTransaction{
-		UserID:             prepared.UserID,
-		Type:               prepared.Type,
-		Amount:             prepared.Amount,
-		Currency:           prepared.Currency,
-		BalanceBefore:      before,
-		BalanceAfter:       after,
-		ReferenceType:      prepared.ReferenceType,
-		ReferenceID:        prepared.ReferenceID,
-		IdempotencyKey:     prepared.IdempotencyKey,
-		RequestFingerprint: fingerprint,
-		OperatorID:         prepared.OperatorID,
-		Source:             prepared.Source,
-		Note:               prepared.Note,
-		Metadata:           prepared.Metadata,
+		UserID:                prepared.UserID,
+		Type:                  prepared.Type,
+		Amount:                prepared.Amount,
+		Currency:              prepared.Currency,
+		BalanceBefore:         before,
+		BalanceAfter:          after,
+		ReferenceType:         prepared.ReferenceType,
+		ReferenceID:           prepared.ReferenceID,
+		IdempotencyKey:        prepared.IdempotencyKey,
+		RequestFingerprint:    fingerprint,
+		OperatorID:            prepared.OperatorID,
+		ReversesTransactionID: prepared.ReversesTransactionID,
+		Source:                prepared.Source,
+		Note:                  prepared.Note,
+		Metadata:              prepared.Metadata,
 	}
 	if err := tx.QueryRowContext(ctx, `
 		INSERT INTO wallet_transactions (
 			user_id, type, amount, currency, balance_before, balance_after,
 			reference_type, reference_id, idempotency_key, request_fingerprint,
-			operator_id, source, note, metadata
+			operator_id, reverses_transaction_id, source, note, metadata
 		) VALUES (
 			$1, $2, $3::numeric, $4, $5::numeric, $6::numeric,
-			$7, $8, $9, $10, $11, $12, $13, $14::jsonb
+			$7, $8, $9, $10, $11, $12, $13, $14, $15::jsonb
 		)
 		RETURNING id, created_at
 	`,
@@ -138,6 +148,7 @@ func (r *walletRepository) applyInTx(ctx context.Context, tx *sql.Tx, cmd *servi
 		entry.IdempotencyKey,
 		entry.RequestFingerprint,
 		entry.OperatorID,
+		entry.ReversesTransactionID,
 		entry.Source,
 		entry.Note,
 		string(metadataJSON),
@@ -146,6 +157,69 @@ func (r *walletRepository) applyInTx(ctx context.Context, tx *sql.Tx, cmd *servi
 	}
 
 	return &service.WalletApplyResult{Applied: true, Transaction: entry}, nil
+}
+
+func validateWalletRefundTarget(ctx context.Context, tx *sql.Tx, cmd *service.WalletMutation) error {
+	var existingRefundID int64
+	err := tx.QueryRowContext(ctx, `
+		SELECT id
+		FROM wallet_transactions
+		WHERE type = 'refund' AND reverses_transaction_id = $1
+	`, *cmd.ReversesTransactionID).Scan(&existingRefundID)
+	if err == nil {
+		return service.ErrWalletAlreadyRefunded
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+
+	var (
+		originalUserID   int64
+		originalType     string
+		originalAmount   string
+		originalCurrency string
+	)
+	err = tx.QueryRowContext(ctx, `
+		SELECT user_id, type, amount::text, currency
+		FROM wallet_transactions
+		WHERE id = $1
+	`, *cmd.ReversesTransactionID).Scan(&originalUserID, &originalType, &originalAmount, &originalCurrency)
+	if errors.Is(err, sql.ErrNoRows) {
+		return service.ErrWalletTransactionNotFound
+	}
+	if err != nil {
+		return err
+	}
+	amount, err := decimal.NewFromString(originalAmount)
+	if err != nil {
+		return fmt.Errorf("parse refund target amount: %w", err)
+	}
+	if originalUserID != cmd.UserID || originalType != string(service.WalletTransactionUsage) || originalCurrency != service.WalletCurrencyCNY || !amount.IsNegative() || !cmd.Amount.Equal(amount.Neg()) {
+		return service.ErrWalletRefundTargetInvalid
+	}
+	return nil
+}
+
+func (r *walletRepository) GetTransaction(ctx context.Context, transactionID int64) (*service.WalletTransaction, error) {
+	if r == nil || r.db == nil {
+		return nil, errors.New("wallet repository db is nil")
+	}
+	if transactionID <= 0 {
+		return nil, fmt.Errorf("%w: transaction_id must be positive", service.ErrWalletInvalidMutation)
+	}
+	entry, err := scanWalletTransaction(r.db.QueryRowContext(ctx, `
+		SELECT
+			id, user_id, type, amount::text, currency,
+			balance_before::text, balance_after::text,
+			reference_type, reference_id, idempotency_key, request_fingerprint,
+			operator_id, reverses_transaction_id, source, note, metadata::text, created_at
+		FROM wallet_transactions
+		WHERE id = $1
+	`, transactionID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, service.ErrWalletTransactionNotFound
+	}
+	return entry, err
 }
 
 func (r *walletRepository) ReconcileUser(ctx context.Context, userID int64) (*service.WalletReconciliation, error) {
@@ -207,7 +281,7 @@ func findWalletTransactionByIdempotencyKey(ctx context.Context, tx *sql.Tx, key 
 			id, user_id, type, amount::text, currency,
 			balance_before::text, balance_after::text,
 			reference_type, reference_id, idempotency_key, request_fingerprint,
-			operator_id, source, note, metadata::text, created_at
+			operator_id, reverses_transaction_id, source, note, metadata::text, created_at
 		FROM wallet_transactions
 		WHERE idempotency_key = $1
 	`, key))
@@ -229,6 +303,7 @@ func scanWalletTransaction(row walletRowScanner) (*service.WalletTransaction, er
 		&entry.IdempotencyKey,
 		&entry.RequestFingerprint,
 		&entry.OperatorID,
+		&entry.ReversesTransactionID,
 		&entry.Source,
 		&entry.Note,
 		&metadataRaw,

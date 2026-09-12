@@ -5,6 +5,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -154,6 +155,78 @@ func TestWalletRepositoryInsertFailureRollsBackBalance(t *testing.T) {
 	require.Zero(t, count)
 }
 
+func TestWalletRepositoryConcurrentFullRefundAppliesOnceAcrossDifferentKeys(t *testing.T) {
+	schemaName := createWalletIntegrationSchema(t, "")
+	usage, err := applyWalletMutationInSchema(context.Background(), schemaName, &service.WalletMutation{
+		UserID:               1,
+		Type:                 service.WalletTransactionUsage,
+		Amount:               decimal.RequireFromString("-4.25"),
+		ReferenceType:        "usage_request",
+		ReferenceID:          "request-refund-1",
+		IdempotencyKey:       "wallet:usage:" + schemaName,
+		Source:               "gateway",
+		AllowNegativeBalance: true,
+	})
+	require.NoError(t, err)
+	require.True(t, usage.Applied)
+	originalID := usage.Transaction.ID
+
+	type outcome struct {
+		result *service.WalletApplyResult
+		err    error
+	}
+	start := make(chan struct{})
+	outcomes := make(chan outcome, 2)
+	var wg sync.WaitGroup
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+			<-start
+			result, applyErr := applyWalletMutationInSchema(context.Background(), schemaName, &service.WalletMutation{
+				UserID:                1,
+				Type:                  service.WalletTransactionRefund,
+				Amount:                decimal.RequireFromString("4.25"),
+				ReferenceType:         "wallet_transaction",
+				ReferenceID:           fmt.Sprint(originalID),
+				IdempotencyKey:        fmt.Sprintf("wallet:refund:%s:%d", schemaName, index),
+				ReversesTransactionID: &originalID,
+				Source:                "admin",
+			})
+			outcomes <- outcome{result: result, err: applyErr}
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+	close(outcomes)
+
+	applied := 0
+	alreadyRefunded := 0
+	for item := range outcomes {
+		switch {
+		case item.err == nil:
+			require.True(t, item.result.Applied)
+			applied++
+		case errors.Is(item.err, service.ErrWalletAlreadyRefunded):
+			alreadyRefunded++
+		default:
+			require.NoError(t, item.err)
+		}
+	}
+	require.Equal(t, 1, applied)
+	require.Equal(t, 1, alreadyRefunded)
+
+	tx := beginWalletSchemaTx(t, schemaName)
+	defer tx.Rollback()
+	reconciliation, err := reconcileWalletUser(context.Background(), tx, 1)
+	require.NoError(t, err)
+	require.True(t, reconciliation.CurrentBalance.IsZero())
+	require.True(t, reconciliation.Difference.IsZero())
+	var refundCount int
+	require.NoError(t, tx.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM wallet_transactions WHERE type = 'refund' AND reverses_transaction_id = $1`, originalID).Scan(&refundCount))
+	require.Equal(t, 1, refundCount)
+}
+
 func createWalletIntegrationSchema(t *testing.T, extraAmountConstraint string) string {
 	t.Helper()
 	schemaName := fmt.Sprintf("wallet_m6_%d_%d", time.Now().UnixNano(), walletIntegrationSchemaSequence.Add(1))
@@ -185,11 +258,22 @@ func createWalletIntegrationSchema(t *testing.T, extraAmountConstraint string) s
 			idempotency_key VARCHAR(160) NOT NULL UNIQUE,
 			request_fingerprint VARCHAR(64) NOT NULL,
 			operator_id BIGINT NULL,
+			reverses_transaction_id BIGINT NULL,
 			source VARCHAR(64) NOT NULL,
 			note VARCHAR(500) NOT NULL,
 			metadata JSONB NOT NULL,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		);
+		ALTER TABLE `+quotedSchema+`.wallet_transactions
+			ADD CONSTRAINT wallet_refund_link_check CHECK (
+				(type = 'refund' AND reverses_transaction_id IS NOT NULL)
+				OR (type <> 'refund' AND reverses_transaction_id IS NULL)
+			);
+		ALTER TABLE `+quotedSchema+`.wallet_transactions
+			ADD CONSTRAINT wallet_refund_link_fkey FOREIGN KEY (reverses_transaction_id)
+			REFERENCES `+quotedSchema+`.wallet_transactions(id) ON DELETE RESTRICT;
+		CREATE UNIQUE INDEX wallet_one_refund_per_usage
+			ON `+quotedSchema+`.wallet_transactions(reverses_transaction_id) WHERE type = 'refund';
 		INSERT INTO `+quotedSchema+`.users (id, balance) VALUES (1, 0);
 	`)
 	require.NoError(t, err)

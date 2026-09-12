@@ -70,6 +70,8 @@ func TestPrepareWalletMutationRejectsInvalidAmountsAndFields(t *testing.T) {
 		{"wrong currency", func(c *WalletMutation) { c.Currency = "USD" }},
 		{"missing reference", func(c *WalletMutation) { c.ReferenceID = "" }},
 		{"bad operator", func(c *WalletMutation) { id := int64(0); c.OperatorID = &id }},
+		{"refund without target", func(c *WalletMutation) { c.Type = WalletTransactionRefund; c.Amount = decimal.NewFromInt(1) }},
+		{"non-refund with target", func(c *WalletMutation) { id := int64(1); c.ReversesTransactionID = &id }},
 	}
 
 	for _, tt := range tests {

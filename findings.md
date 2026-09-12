@@ -215,7 +215,7 @@ Sticky 的 request header 与客户端实际行为仍待 M3、M11 验证。Nginx
 3. 价格修改缺少统一不可变版本历史。
 4. usage log 无完整单价快照。
 5. `users.balance` 虽映射 PostgreSQL decimal，Go 侧仍是 float。
-6. Admin balance history 借用 redeem code 与 affiliate ledger，缺少统一钱包流水。
+6. 基线 Admin balance history 借用 redeem code 与 affiliate ledger，缺少统一钱包流水；M6.1/M6.2 已新增 CNY 不可变流水并把受控 Admin 写入口切入 Wallet Service。
 
 `usage_billing_repo.Apply` 的事务和 dedup 很有价值。它先认领 `(request_id, api_key_id)`，再更新余额和 quota。余额不足时当前实现仍允许扣成负数，符合已开始 Streaming 的结算需求。
 
@@ -353,3 +353,12 @@ README_CN 另有以下项目声明：服务条款风险、仅供技术学习研�
 2. M6 优先完成钱包不可变流水、Decimal 热路径、API Key 摘要和 Account credential 加密。
 3. 同一 Milestone 完成用户模型权限、显式目标 Group 路由与唯一约束，禁止跨成本池 fallback。
 4. 完成人工确认清单，尤其是 Subscription 合规与 DeepSeek 模型名。
+
+## 22. M6.2 实施确认
+
+1. 管理员充值和调账现已使用十进制字符串、钱包事务、管理员 operator、请求幂等键和非空备注；负调账不能使余额低于零。
+2. usage 退款只允许一次性全额退款。HTTP 幂等负责请求重放，`reverses_transaction_id` 的部分唯一索引和数据库 trigger 独立校验同用户、负数 CNY usage 与完整反向金额。
+3. 钱包写路由由 step-up 中间件保护；启用时 Admin API Key 被拒绝，必须使用近期完成 TOTP 验证的管理员会话。管理员和普通用户余额查询均返回八位定点字符串，普通用户 ID 只取自认证 subject。
+4. 通用 Admin User 创建被限制为零初始余额，通用更新不能携带 balance，旧 float 型 `AdminService.UpdateUserBalance` 已移除，避免内部或后台 CRUD 绕过流水。公开注册目前由 M2 关闭；未来若恢复且配置非零默认余额，必须先补齐同事务开账。
+5. 真实 PostgreSQL 18 已验证 migration 幂等、schema、trigger、不同请求键的并发退款唯一性和对账。本地升级库 migration checksum 为 64 位，2 个现有测试用户仍只有 2 条 opening 流水，对账差异为零。
+6. Gateway usage 仍沿用既有结算路径，尚未生成 `wallet_transactions` usage 行；不能把 M6.2 解释为完整收费闭环。下一顺序项为用户模型权限，usage 原子结算和定时对账仍需在 M6 后续子任务完成。

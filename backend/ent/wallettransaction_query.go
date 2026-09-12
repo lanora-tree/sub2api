@@ -26,6 +26,8 @@ type WalletTransactionQuery struct {
 	predicates   []predicate.WalletTransaction
 	withUser     *UserQuery
 	withOperator *UserQuery
+	withRefund   *WalletTransactionQuery
+	withReverses *WalletTransactionQuery
 	modifiers    []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
@@ -100,6 +102,50 @@ func (_q *WalletTransactionQuery) QueryOperator() *UserQuery {
 			sqlgraph.From(wallettransaction.Table, wallettransaction.FieldID, selector),
 			sqlgraph.To(user.Table, user.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, wallettransaction.OperatorTable, wallettransaction.OperatorColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryRefund chains the current query on the "refund" edge.
+func (_q *WalletTransactionQuery) QueryRefund() *WalletTransactionQuery {
+	query := (&WalletTransactionClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(wallettransaction.Table, wallettransaction.FieldID, selector),
+			sqlgraph.To(wallettransaction.Table, wallettransaction.FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, false, wallettransaction.RefundTable, wallettransaction.RefundColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryReverses chains the current query on the "reverses" edge.
+func (_q *WalletTransactionQuery) QueryReverses() *WalletTransactionQuery {
+	query := (&WalletTransactionClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(wallettransaction.Table, wallettransaction.FieldID, selector),
+			sqlgraph.To(wallettransaction.Table, wallettransaction.FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, true, wallettransaction.ReversesTable, wallettransaction.ReversesColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -301,6 +347,8 @@ func (_q *WalletTransactionQuery) Clone() *WalletTransactionQuery {
 		predicates:   append([]predicate.WalletTransaction{}, _q.predicates...),
 		withUser:     _q.withUser.Clone(),
 		withOperator: _q.withOperator.Clone(),
+		withRefund:   _q.withRefund.Clone(),
+		withReverses: _q.withReverses.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -326,6 +374,28 @@ func (_q *WalletTransactionQuery) WithOperator(opts ...func(*UserQuery)) *Wallet
 		opt(query)
 	}
 	_q.withOperator = query
+	return _q
+}
+
+// WithRefund tells the query-builder to eager-load the nodes that are connected to
+// the "refund" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *WalletTransactionQuery) WithRefund(opts ...func(*WalletTransactionQuery)) *WalletTransactionQuery {
+	query := (&WalletTransactionClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withRefund = query
+	return _q
+}
+
+// WithReverses tells the query-builder to eager-load the nodes that are connected to
+// the "reverses" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *WalletTransactionQuery) WithReverses(opts ...func(*WalletTransactionQuery)) *WalletTransactionQuery {
+	query := (&WalletTransactionClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withReverses = query
 	return _q
 }
 
@@ -407,9 +477,11 @@ func (_q *WalletTransactionQuery) sqlAll(ctx context.Context, hooks ...queryHook
 	var (
 		nodes       = []*WalletTransaction{}
 		_spec       = _q.querySpec()
-		loadedTypes = [2]bool{
+		loadedTypes = [4]bool{
 			_q.withUser != nil,
 			_q.withOperator != nil,
+			_q.withRefund != nil,
+			_q.withReverses != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -442,6 +514,18 @@ func (_q *WalletTransactionQuery) sqlAll(ctx context.Context, hooks ...queryHook
 	if query := _q.withOperator; query != nil {
 		if err := _q.loadOperator(ctx, query, nodes, nil,
 			func(n *WalletTransaction, e *User) { n.Edges.Operator = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withRefund; query != nil {
+		if err := _q.loadRefund(ctx, query, nodes, nil,
+			func(n *WalletTransaction, e *WalletTransaction) { n.Edges.Refund = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withReverses; query != nil {
+		if err := _q.loadReverses(ctx, query, nodes, nil,
+			func(n *WalletTransaction, e *WalletTransaction) { n.Edges.Reverses = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -509,6 +593,70 @@ func (_q *WalletTransactionQuery) loadOperator(ctx context.Context, query *UserQ
 	}
 	return nil
 }
+func (_q *WalletTransactionQuery) loadRefund(ctx context.Context, query *WalletTransactionQuery, nodes []*WalletTransaction, init func(*WalletTransaction), assign func(*WalletTransaction, *WalletTransaction)) error {
+	ids := make([]int64, 0, len(nodes))
+	nodeids := make(map[int64][]*WalletTransaction)
+	for i := range nodes {
+		if nodes[i].ReversesTransactionID == nil {
+			continue
+		}
+		fk := *nodes[i].ReversesTransactionID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(wallettransaction.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "reverses_transaction_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
+func (_q *WalletTransactionQuery) loadReverses(ctx context.Context, query *WalletTransactionQuery, nodes []*WalletTransaction, init func(*WalletTransaction), assign func(*WalletTransaction, *WalletTransaction)) error {
+	ids := make([]int64, 0, len(nodes))
+	nodeids := make(map[int64][]*WalletTransaction)
+	for i := range nodes {
+		if nodes[i].ReversesTransactionID == nil {
+			continue
+		}
+		fk := *nodes[i].ReversesTransactionID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(wallettransaction.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "reverses_transaction_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
 
 func (_q *WalletTransactionQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := _q.querySpec()
@@ -543,6 +691,12 @@ func (_q *WalletTransactionQuery) querySpec() *sqlgraph.QuerySpec {
 		}
 		if _q.withOperator != nil {
 			_spec.Node.AddColumnOnce(wallettransaction.FieldOperatorID)
+		}
+		if _q.withRefund != nil {
+			_spec.Node.AddColumnOnce(wallettransaction.FieldReversesTransactionID)
+		}
+		if _q.withReverses != nil {
+			_spec.Node.AddColumnOnce(wallettransaction.FieldReversesTransactionID)
 		}
 	}
 	if ps := _q.predicates; len(ps) > 0 {

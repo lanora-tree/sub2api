@@ -19,12 +19,23 @@ import type {
   PlatformQuotasResponse,
 } from '@/types'
 
+export interface WalletBalanceResponse {
+  user_id: number
+  currency: 'CNY'
+  balance: string
+}
+
 /**
  * Get current user profile
  * @returns User profile data
  */
 export async function getProfile(): Promise<User> {
   const { data } = await apiClient.get<User>('/user/profile')
+  return data
+}
+
+export async function getWallet(): Promise<WalletBalanceResponse> {
+  const { data } = await apiClient.get<WalletBalanceResponse>('/user/wallet')
   return data
 }
 
@@ -196,6 +207,7 @@ export async function getMyPlatformQuotas(): Promise<PlatformQuotasResponse> {
 
 export const userAPI = {
   getProfile,
+  getWallet,
   updateProfile,
   changePassword,
   sendNotifyEmailCode,

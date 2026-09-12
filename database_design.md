@@ -364,6 +364,8 @@ settled_at TIMESTAMPTZ NULL
 
 退款必须引用原 usage 流水。为 `refund:{original_transaction_id}` 建立唯一幂等键。部分退款如未来需要支持，应加入退款序号和累计上限，V1 默认仅支持一次全额人工退款。
 
+M6.2 使用 forward-only migration `241_wallet_refund_link.sql` 增加 `reverses_transaction_id` 自引用外键，并对 refund 行建立部分唯一索引。这样 HTTP `Idempotency-Key` 负责同一请求重放，`reverses_transaction_id` 唯一性独立保证即使请求键不同也不能重复退款；Repository 在同一事务内校验原流水属于同一用户、类型为 usage 且金额为负，再从原流水派生完整退款金额。
+
 ## 8. 对账
 
 每日执行：

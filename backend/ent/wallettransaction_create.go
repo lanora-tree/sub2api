@@ -106,6 +106,20 @@ func (_c *WalletTransactionCreate) SetNillableOperatorID(v *int64) *WalletTransa
 	return _c
 }
 
+// SetReversesTransactionID sets the "reverses_transaction_id" field.
+func (_c *WalletTransactionCreate) SetReversesTransactionID(v int64) *WalletTransactionCreate {
+	_c.mutation.SetReversesTransactionID(v)
+	return _c
+}
+
+// SetNillableReversesTransactionID sets the "reverses_transaction_id" field if the given value is not nil.
+func (_c *WalletTransactionCreate) SetNillableReversesTransactionID(v *int64) *WalletTransactionCreate {
+	if v != nil {
+		_c.SetReversesTransactionID(*v)
+	}
+	return _c
+}
+
 // SetSource sets the "source" field.
 func (_c *WalletTransactionCreate) SetSource(v string) *WalletTransactionCreate {
 	_c.mutation.SetSource(v)
@@ -154,6 +168,44 @@ func (_c *WalletTransactionCreate) SetUser(v *User) *WalletTransactionCreate {
 // SetOperator sets the "operator" edge to the User entity.
 func (_c *WalletTransactionCreate) SetOperator(v *User) *WalletTransactionCreate {
 	return _c.SetOperatorID(v.ID)
+}
+
+// SetRefundID sets the "refund" edge to the WalletTransaction entity by ID.
+func (_c *WalletTransactionCreate) SetRefundID(id int64) *WalletTransactionCreate {
+	_c.mutation.SetRefundID(id)
+	return _c
+}
+
+// SetNillableRefundID sets the "refund" edge to the WalletTransaction entity by ID if the given value is not nil.
+func (_c *WalletTransactionCreate) SetNillableRefundID(id *int64) *WalletTransactionCreate {
+	if id != nil {
+		_c = _c.SetRefundID(*id)
+	}
+	return _c
+}
+
+// SetRefund sets the "refund" edge to the WalletTransaction entity.
+func (_c *WalletTransactionCreate) SetRefund(v *WalletTransaction) *WalletTransactionCreate {
+	return _c.SetRefundID(v.ID)
+}
+
+// SetReversesID sets the "reverses" edge to the WalletTransaction entity by ID.
+func (_c *WalletTransactionCreate) SetReversesID(id int64) *WalletTransactionCreate {
+	_c.mutation.SetReversesID(id)
+	return _c
+}
+
+// SetNillableReversesID sets the "reverses" edge to the WalletTransaction entity by ID if the given value is not nil.
+func (_c *WalletTransactionCreate) SetNillableReversesID(id *int64) *WalletTransactionCreate {
+	if id != nil {
+		_c = _c.SetReversesID(*id)
+	}
+	return _c
+}
+
+// SetReverses sets the "reverses" edge to the WalletTransaction entity.
+func (_c *WalletTransactionCreate) SetReverses(v *WalletTransaction) *WalletTransactionCreate {
+	return _c.SetReversesID(v.ID)
 }
 
 // Mutation returns the WalletTransactionMutation object of the builder.
@@ -409,6 +461,40 @@ func (_c *WalletTransactionCreate) createSpec() (*WalletTransaction, *sqlgraph.C
 		_node.OperatorID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
+	if nodes := _c.mutation.RefundIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: false,
+			Table:   wallettransaction.RefundTable,
+			Columns: []string{wallettransaction.RefundColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(wallettransaction.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.ReversesTransactionID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ReversesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: true,
+			Table:   wallettransaction.ReversesTable,
+			Columns: []string{wallettransaction.ReversesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(wallettransaction.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.ReversesTransactionID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
 	return _node, _spec
 }
 
@@ -504,6 +590,9 @@ func (u *WalletTransactionUpsertOne) UpdateNewValues() *WalletTransactionUpsertO
 		}
 		if _, exists := u.create.mutation.OperatorID(); exists {
 			s.SetIgnore(wallettransaction.FieldOperatorID)
+		}
+		if _, exists := u.create.mutation.ReversesTransactionID(); exists {
+			s.SetIgnore(wallettransaction.FieldReversesTransactionID)
 		}
 		if _, exists := u.create.mutation.Source(); exists {
 			s.SetIgnore(wallettransaction.FieldSource)
@@ -756,6 +845,9 @@ func (u *WalletTransactionUpsertBulk) UpdateNewValues() *WalletTransactionUpsert
 			}
 			if _, exists := b.mutation.OperatorID(); exists {
 				s.SetIgnore(wallettransaction.FieldOperatorID)
+			}
+			if _, exists := b.mutation.ReversesTransactionID(); exists {
+				s.SetIgnore(wallettransaction.FieldReversesTransactionID)
 			}
 			if _, exists := b.mutation.Source(); exists {
 				s.SetIgnore(wallettransaction.FieldSource)

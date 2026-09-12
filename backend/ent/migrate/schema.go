@@ -2103,6 +2103,7 @@ var (
 		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
 		{Name: "user_id", Type: field.TypeInt64},
 		{Name: "operator_id", Type: field.TypeInt64, Nullable: true},
+		{Name: "reverses_transaction_id", Type: field.TypeInt64, Unique: true, Nullable: true},
 	}
 	// WalletTransactionsTable holds the schema information for the "wallet_transactions" table.
 	WalletTransactionsTable = &schema.Table{
@@ -2121,6 +2122,12 @@ var (
 				Columns:    []*schema.Column{WalletTransactionsColumns[15]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
 				OnDelete:   schema.Restrict,
+			},
+			{
+				Symbol:     "wallet_transactions_wallet_transactions_refund",
+				Columns:    []*schema.Column{WalletTransactionsColumns[16]},
+				RefColumns: []*schema.Column{WalletTransactionsColumns[0]},
+				OnDelete:   schema.SetNull,
 			},
 		},
 		Indexes: []*schema.Index{
@@ -2337,6 +2344,7 @@ func init() {
 	}
 	WalletTransactionsTable.ForeignKeys[0].RefTable = UsersTable
 	WalletTransactionsTable.ForeignKeys[1].RefTable = UsersTable
+	WalletTransactionsTable.ForeignKeys[2].RefTable = WalletTransactionsTable
 	WalletTransactionsTable.Annotation = &entsql.Annotation{
 		Table: "wallet_transactions",
 	}

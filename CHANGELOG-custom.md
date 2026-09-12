@@ -54,6 +54,19 @@
 
 应用可回退至 M2 代码继续读取 `users.balance`。Migration forward-only：不得删除或改写已生成的开账/业务流水；如测试数据库需要完全恢复，使用升级前备份重建。Admin 与 Gateway 旧余额写路径在本子任务尚未切换。
 
+### M6.2 completed
+
+* 新增管理员钱包 Service 与资源 API：精确字符串充值、正负调账、一次性全额 usage 退款、管理员余额查询和当前用户余额查询；旧 `/balance` 仅保留为相同严格契约的兼容别名。
+* 管理员写入强制认证 subject、step-up 中间件、非空 `Idempotency-Key` 与备注；钱包流水记录 operator，成功写入后失效余额/认证缓存。负调账不能制造负余额。
+* 新增 forward-only migration `241_wallet_refund_link.sql`：退款自引用外键、类型配对约束、同一 usage 仅一次退款的部分唯一索引和数据库级全额退款校验 trigger。
+* 通用 Admin User 创建强制零余额，通用更新拒绝 balance 字段，并移除旧 float 型 `AdminService.UpdateUserBalance` 能力，防止内部或后台 CRUD 绕开不可变流水；前端余额操作改为 CNY、十进制字符串、稳定请求键与 TOTP step-up。
+* Backend 全量、Frontend lint/typecheck/252 个文件 1841 个测试/production build、PostgreSQL 18 migration/并发退款 integration、本地升级 migration/对账和 M6.2 临时镜像健康检查全部通过。
+* 本地验收镜像 `sub2api:m6-admin-wallet` digest 为 `sha256:d34ceec2902ed37a6861e39a12b4dfc4267341b782e8f0680dca02dd33068f5e`。
+
+### M6.2 recovery
+
+应用可回退至 M6.1；新增列为空时旧读取路径兼容。Migration 与已经写入的退款流水保持 forward-only，不得删除、改写或解除唯一性。测试库完全恢复使用升级前备份；生产纠错只能新增补偿调账。公开注册继续保持关闭，未来恢复前必须为非零默认余额补充开账事务。
+
 ### M0 completed
 
 * 在 `codex/m0-baseline` 固定上游提交 `b1748c4ea99ce2120401a269142aa071e18a84da`。

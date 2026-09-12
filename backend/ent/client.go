@@ -7002,6 +7002,38 @@ func (c *WalletTransactionClient) QueryOperator(_m *WalletTransaction) *UserQuer
 	return query
 }
 
+// QueryRefund queries the refund edge of a WalletTransaction.
+func (c *WalletTransactionClient) QueryRefund(_m *WalletTransaction) *WalletTransactionQuery {
+	query := (&WalletTransactionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(wallettransaction.Table, wallettransaction.FieldID, id),
+			sqlgraph.To(wallettransaction.Table, wallettransaction.FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, false, wallettransaction.RefundTable, wallettransaction.RefundColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryReverses queries the reverses edge of a WalletTransaction.
+func (c *WalletTransactionClient) QueryReverses(_m *WalletTransaction) *WalletTransactionQuery {
+	query := (&WalletTransactionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(wallettransaction.Table, wallettransaction.FieldID, id),
+			sqlgraph.To(wallettransaction.Table, wallettransaction.FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, true, wallettransaction.ReversesTable, wallettransaction.ReversesColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *WalletTransactionClient) Hooks() []Hook {
 	return c.hooks.WalletTransaction

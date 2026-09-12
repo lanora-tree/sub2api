@@ -175,6 +175,8 @@ Chat Completions 普通与 Streaming 都必须请求或解析 usage。Reasoning 
 
 M6.1 基础实现采用全局唯一 `idempotency_key` 与规范化 SHA-256 fingerprint。并发重试先取得事务级 advisory lock：相同 key、相同 fingerprint 返回原流水，相同 key、不同 fingerprint 返回冲突。余额行使用 `SELECT ... FOR UPDATE` 串行化；更新余额和插入流水任一步失败都会回滚。`usage` 允许 `0.00000000` 以保留极小费用舍入后的审计记录，充值和退款必须为正，普通调账必须非零。
 
+M6.2 已把管理员充值、调账和一次性全额 usage 退款接入该事务，并提供管理员及当前用户的对账式余额查询。退款流水通过 `reverses_transaction_id` 引用原 usage，数据库部分唯一索引独立阻止不同请求键造成的重复退款；写入后失效认证与余额缓存。通用 Admin User 创建强制零余额，通用 User 更新拒绝 balance 字段，避免绕开钱包流水。公开注册仍在 M2 保持关闭，若未来恢复，必须先把非零默认余额开账纳入同一事务。
+
 ### 9.3 管理员充值
 
 Admin 写入必须带 Idempotency Key、note 和 operator ID。一个事务中完成用户锁、流水插入、余额更新和审计所需业务数据。审计日志可以在事务提交后写，但钱包流水本身已经保留操作人和 note。

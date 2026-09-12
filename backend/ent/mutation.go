@@ -57074,6 +57074,10 @@ type WalletTransactionMutation struct {
 	cleareduser         bool
 	operator            *int64
 	clearedoperator     bool
+	refund              *int64
+	clearedrefund       bool
+	reverses            *int64
+	clearedreverses     bool
 	done                bool
 	oldValue            func(context.Context) (*WalletTransaction, error)
 	predicates          []predicate.WalletTransaction
@@ -57646,6 +57650,55 @@ func (m *WalletTransactionMutation) ResetOperatorID() {
 	delete(m.clearedFields, wallettransaction.FieldOperatorID)
 }
 
+// SetReversesTransactionID sets the "reverses_transaction_id" field.
+func (m *WalletTransactionMutation) SetReversesTransactionID(i int64) {
+	m.refund = &i
+}
+
+// ReversesTransactionID returns the value of the "reverses_transaction_id" field in the mutation.
+func (m *WalletTransactionMutation) ReversesTransactionID() (r int64, exists bool) {
+	v := m.refund
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReversesTransactionID returns the old "reverses_transaction_id" field's value of the WalletTransaction entity.
+// If the WalletTransaction object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WalletTransactionMutation) OldReversesTransactionID(ctx context.Context) (v *int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReversesTransactionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReversesTransactionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReversesTransactionID: %w", err)
+	}
+	return oldValue.ReversesTransactionID, nil
+}
+
+// ClearReversesTransactionID clears the value of the "reverses_transaction_id" field.
+func (m *WalletTransactionMutation) ClearReversesTransactionID() {
+	m.refund = nil
+	m.clearedFields[wallettransaction.FieldReversesTransactionID] = struct{}{}
+}
+
+// ReversesTransactionIDCleared returns if the "reverses_transaction_id" field was cleared in this mutation.
+func (m *WalletTransactionMutation) ReversesTransactionIDCleared() bool {
+	_, ok := m.clearedFields[wallettransaction.FieldReversesTransactionID]
+	return ok
+}
+
+// ResetReversesTransactionID resets all changes to the "reverses_transaction_id" field.
+func (m *WalletTransactionMutation) ResetReversesTransactionID() {
+	m.refund = nil
+	delete(m.clearedFields, wallettransaction.FieldReversesTransactionID)
+}
+
 // SetSource sets the "source" field.
 func (m *WalletTransactionMutation) SetSource(s string) {
 	m.source = &s
@@ -57844,6 +57897,86 @@ func (m *WalletTransactionMutation) ResetOperator() {
 	m.clearedoperator = false
 }
 
+// SetRefundID sets the "refund" edge to the WalletTransaction entity by id.
+func (m *WalletTransactionMutation) SetRefundID(id int64) {
+	m.refund = &id
+}
+
+// ClearRefund clears the "refund" edge to the WalletTransaction entity.
+func (m *WalletTransactionMutation) ClearRefund() {
+	m.clearedrefund = true
+	m.clearedFields[wallettransaction.FieldReversesTransactionID] = struct{}{}
+}
+
+// RefundCleared reports if the "refund" edge to the WalletTransaction entity was cleared.
+func (m *WalletTransactionMutation) RefundCleared() bool {
+	return m.ReversesTransactionIDCleared() || m.clearedrefund
+}
+
+// RefundID returns the "refund" edge ID in the mutation.
+func (m *WalletTransactionMutation) RefundID() (id int64, exists bool) {
+	if m.refund != nil {
+		return *m.refund, true
+	}
+	return
+}
+
+// RefundIDs returns the "refund" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// RefundID instead. It exists only for internal usage by the builders.
+func (m *WalletTransactionMutation) RefundIDs() (ids []int64) {
+	if id := m.refund; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetRefund resets all changes to the "refund" edge.
+func (m *WalletTransactionMutation) ResetRefund() {
+	m.refund = nil
+	m.clearedrefund = false
+}
+
+// SetReversesID sets the "reverses" edge to the WalletTransaction entity by id.
+func (m *WalletTransactionMutation) SetReversesID(id int64) {
+	m.reverses = &id
+}
+
+// ClearReverses clears the "reverses" edge to the WalletTransaction entity.
+func (m *WalletTransactionMutation) ClearReverses() {
+	m.clearedreverses = true
+	m.clearedFields[wallettransaction.FieldReversesTransactionID] = struct{}{}
+}
+
+// ReversesCleared reports if the "reverses" edge to the WalletTransaction entity was cleared.
+func (m *WalletTransactionMutation) ReversesCleared() bool {
+	return m.ReversesTransactionIDCleared() || m.clearedreverses
+}
+
+// ReversesID returns the "reverses" edge ID in the mutation.
+func (m *WalletTransactionMutation) ReversesID() (id int64, exists bool) {
+	if m.reverses != nil {
+		return *m.reverses, true
+	}
+	return
+}
+
+// ReversesIDs returns the "reverses" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// ReversesID instead. It exists only for internal usage by the builders.
+func (m *WalletTransactionMutation) ReversesIDs() (ids []int64) {
+	if id := m.reverses; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetReverses resets all changes to the "reverses" edge.
+func (m *WalletTransactionMutation) ResetReverses() {
+	m.reverses = nil
+	m.clearedreverses = false
+}
+
 // Where appends a list predicates to the WalletTransactionMutation builder.
 func (m *WalletTransactionMutation) Where(ps ...predicate.WalletTransaction) {
 	m.predicates = append(m.predicates, ps...)
@@ -57878,7 +58011,7 @@ func (m *WalletTransactionMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *WalletTransactionMutation) Fields() []string {
-	fields := make([]string, 0, 15)
+	fields := make([]string, 0, 16)
 	if m.user != nil {
 		fields = append(fields, wallettransaction.FieldUserID)
 	}
@@ -57911,6 +58044,9 @@ func (m *WalletTransactionMutation) Fields() []string {
 	}
 	if m.operator != nil {
 		fields = append(fields, wallettransaction.FieldOperatorID)
+	}
+	if m.refund != nil {
+		fields = append(fields, wallettransaction.FieldReversesTransactionID)
 	}
 	if m.source != nil {
 		fields = append(fields, wallettransaction.FieldSource)
@@ -57954,6 +58090,8 @@ func (m *WalletTransactionMutation) Field(name string) (ent.Value, bool) {
 		return m.RequestFingerprint()
 	case wallettransaction.FieldOperatorID:
 		return m.OperatorID()
+	case wallettransaction.FieldReversesTransactionID:
+		return m.ReversesTransactionID()
 	case wallettransaction.FieldSource:
 		return m.Source()
 	case wallettransaction.FieldNote:
@@ -57993,6 +58131,8 @@ func (m *WalletTransactionMutation) OldField(ctx context.Context, name string) (
 		return m.OldRequestFingerprint(ctx)
 	case wallettransaction.FieldOperatorID:
 		return m.OldOperatorID(ctx)
+	case wallettransaction.FieldReversesTransactionID:
+		return m.OldReversesTransactionID(ctx)
 	case wallettransaction.FieldSource:
 		return m.OldSource(ctx)
 	case wallettransaction.FieldNote:
@@ -58086,6 +58226,13 @@ func (m *WalletTransactionMutation) SetField(name string, value ent.Value) error
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetOperatorID(v)
+		return nil
+	case wallettransaction.FieldReversesTransactionID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReversesTransactionID(v)
 		return nil
 	case wallettransaction.FieldSource:
 		v, ok := value.(string)
@@ -58187,6 +58334,9 @@ func (m *WalletTransactionMutation) ClearedFields() []string {
 	if m.FieldCleared(wallettransaction.FieldOperatorID) {
 		fields = append(fields, wallettransaction.FieldOperatorID)
 	}
+	if m.FieldCleared(wallettransaction.FieldReversesTransactionID) {
+		fields = append(fields, wallettransaction.FieldReversesTransactionID)
+	}
 	return fields
 }
 
@@ -58203,6 +58353,9 @@ func (m *WalletTransactionMutation) ClearField(name string) error {
 	switch name {
 	case wallettransaction.FieldOperatorID:
 		m.ClearOperatorID()
+		return nil
+	case wallettransaction.FieldReversesTransactionID:
+		m.ClearReversesTransactionID()
 		return nil
 	}
 	return fmt.Errorf("unknown WalletTransaction nullable field %s", name)
@@ -58245,6 +58398,9 @@ func (m *WalletTransactionMutation) ResetField(name string) error {
 	case wallettransaction.FieldOperatorID:
 		m.ResetOperatorID()
 		return nil
+	case wallettransaction.FieldReversesTransactionID:
+		m.ResetReversesTransactionID()
+		return nil
 	case wallettransaction.FieldSource:
 		m.ResetSource()
 		return nil
@@ -58263,12 +58419,18 @@ func (m *WalletTransactionMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *WalletTransactionMutation) AddedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 4)
 	if m.user != nil {
 		edges = append(edges, wallettransaction.EdgeUser)
 	}
 	if m.operator != nil {
 		edges = append(edges, wallettransaction.EdgeOperator)
+	}
+	if m.refund != nil {
+		edges = append(edges, wallettransaction.EdgeRefund)
+	}
+	if m.reverses != nil {
+		edges = append(edges, wallettransaction.EdgeReverses)
 	}
 	return edges
 }
@@ -58285,13 +58447,21 @@ func (m *WalletTransactionMutation) AddedIDs(name string) []ent.Value {
 		if id := m.operator; id != nil {
 			return []ent.Value{*id}
 		}
+	case wallettransaction.EdgeRefund:
+		if id := m.refund; id != nil {
+			return []ent.Value{*id}
+		}
+	case wallettransaction.EdgeReverses:
+		if id := m.reverses; id != nil {
+			return []ent.Value{*id}
+		}
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *WalletTransactionMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 4)
 	return edges
 }
 
@@ -58303,12 +58473,18 @@ func (m *WalletTransactionMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *WalletTransactionMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 4)
 	if m.cleareduser {
 		edges = append(edges, wallettransaction.EdgeUser)
 	}
 	if m.clearedoperator {
 		edges = append(edges, wallettransaction.EdgeOperator)
+	}
+	if m.clearedrefund {
+		edges = append(edges, wallettransaction.EdgeRefund)
+	}
+	if m.clearedreverses {
+		edges = append(edges, wallettransaction.EdgeReverses)
 	}
 	return edges
 }
@@ -58321,6 +58497,10 @@ func (m *WalletTransactionMutation) EdgeCleared(name string) bool {
 		return m.cleareduser
 	case wallettransaction.EdgeOperator:
 		return m.clearedoperator
+	case wallettransaction.EdgeRefund:
+		return m.clearedrefund
+	case wallettransaction.EdgeReverses:
+		return m.clearedreverses
 	}
 	return false
 }
@@ -58335,6 +58515,12 @@ func (m *WalletTransactionMutation) ClearEdge(name string) error {
 	case wallettransaction.EdgeOperator:
 		m.ClearOperator()
 		return nil
+	case wallettransaction.EdgeRefund:
+		m.ClearRefund()
+		return nil
+	case wallettransaction.EdgeReverses:
+		m.ClearReverses()
+		return nil
 	}
 	return fmt.Errorf("unknown WalletTransaction unique edge %s", name)
 }
@@ -58348,6 +58534,12 @@ func (m *WalletTransactionMutation) ResetEdge(name string) error {
 		return nil
 	case wallettransaction.EdgeOperator:
 		m.ResetOperator()
+		return nil
+	case wallettransaction.EdgeRefund:
+		m.ResetRefund()
+		return nil
+	case wallettransaction.EdgeReverses:
+		m.ResetReverses()
 		return nil
 	}
 	return fmt.Errorf("unknown WalletTransaction edge %s", name)

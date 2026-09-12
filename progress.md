@@ -540,7 +540,66 @@ M6.1 实现完成但动态数据库验收未完成，保持 `in_progress`。Wind
 
 M6.1 完成并可形成独立提交。Migration 已在本地测试库执行，因此 `240_cny_wallet_transactions.sql` 从此按已发布 migration 对待，不得重写、重命名或删除。M6 继续保持 `in_progress`，下一项为 M6.2：把管理员充值、退款、调账和用户余额查询接入钱包事务与授权边界；Gateway usage 事务切换仍留在后续 M6 账务整合任务。
 
-## 17. 后续记录模板
+## 17. 2026-09-13 / M6.2 开始：管理员钱包操作与余额查询
+
+### 目标与边界
+
+本子任务只把管理员充值、管理员正负调账、一次性全额 usage 退款，以及管理员/当前用户余额查询接入 M6.1 钱包事务。Gateway usage 结算、外部充值、API Key 摘要、Account credential 加密和前端整体 CNY 改版仍按后续子任务处理。
+
+### Schema 与账务变更说明
+
+* 原因：退款必须引用原 usage 流水，并且即使管理员换用新的请求幂等键，也只能全额退款一次；仅靠 HTTP 幂等键不能表达该业务唯一性。
+* 影响：新增 forward-only migration `241_wallet_refund_link.sql`，为 `wallet_transactions` 增加只读的 `reverses_transaction_id` 自引用外键、refund 类型配对约束和部分唯一索引。`240_cny_wallet_transactions.sql` 保持原样。
+* 回滚：应用可回退到 M6.1，但 migration 不逆向删除。新增列为空时不影响旧代码；已写退款流水不可更新或删除，只能用新的补偿调账纠正。
+* API：所有新增金额字段均为十进制定点字符串；管理员写操作要求可解析到真实管理员的认证 subject、step-up 门控、非空 `Idempotency-Key` 和非空备注；当前用户查询仅从认证 subject 获取 user ID。
+* 负余额：管理员负调账禁止把余额降到零以下；usage 退款只退原 usage 流水的完整绝对金额。普通管理员接口不能写任意 refund 金额。
+
+### 计划测试
+
+* Service：字符串金额、小数位/范围、操作类型、管理员/备注/幂等键门禁、退款派生与错误映射。
+* Repository：退款原流水校验、跨用户拒绝、非 usage 拒绝、一次全额唯一性、并发退款、事务回滚与对账。
+* Handler/route：管理员写入、当前用户隔离、Decimal 字符串响应、缺少幂等键或身份拒绝。
+* Milestone 子任务结束前：Ent/Wire generate、Backend 全套、Frontend lint/typecheck/相关测试、真实 PostgreSQL integration、本地升级库 migration 与黑盒验收、`git diff --check`。
+
+## 18. 2026-09-13 / M6.2 完成：管理员钱包操作与余额查询
+
+### 完成任务
+
+* 新增 `WalletService`，管理员充值只接受正数且最多两位小数，调账只接受非零有符号字符串且最多八位小数；所有管理员写入强制真实 operator、非空请求幂等键和非空备注。
+* 管理员充值、调账、一次性全额 usage 退款统一进入 M6.1 钱包事务；退款金额从原负数 CNY usage 派生，不接受调用端金额。成功写入后失效 API Key auth 与 billing balance 缓存。
+* 新增管理员余额查询和当前用户余额查询。普通用户 handler 只读取认证 subject，不接受外部 User ID；响应金额固定为八位十进制字符串。
+* 新增 forward-only migration `241_wallet_refund_link.sql`：退款自引用外键、类型配对 check、同一 usage 一次退款的部分唯一索引，以及同用户/负数 CNY usage/完整反向金额的数据库 trigger 校验。
+* 管理员钱包写路由接入 step-up 中间件和 Admin audit action；旧 `/users/:id/balance` 只作为相同严格契约的兼容别名，不再支持任意 set。
+* 通用 Admin User 创建强制零初始余额，通用更新拒绝 balance 字段，并移除旧 float 型 `AdminService.UpdateUserBalance`；Admin UI 删除创建余额输入，并把充值/扣减改为 CNY 字符串、稳定幂等键、必填备注和 TOTP step-up。
+
+### 数据库变更与恢复
+
+* 原因、影响和回滚边界已在 M6.2 开始记录及 `database_design.md` 固化；migration 240 未改写。
+* 升级前备份：`C:\Users\Administrator\AppData\Local\Temp\sub2api-m6-backups\pre-m6-2-20260913-064855.dump`，573479 bytes，`pg_restore -l` 可读取 1218 个 TOC 条目。
+* `241_wallet_refund_link.sql` 已写入本地测试库，checksum 长度 64。该 migration 从此视为已发布，禁止重写、重命名或删除。
+* 应用可回退 M6.1；schema 保持 forward-only。测试库可用上述备份重建，生产纠错只能新增补偿调账，不得修改不可变流水。
+
+### 验收结果
+
+| 检查 | 结果 |
+| --- | --- |
+| Backend 聚焦测试 | Service、repository SQL mock、admin/user handler、route step-up、audit 全部通过 |
+| Backend 全量 | Go 1.27 Linux builder 执行 `go test ./... -count=1`，所有 package 通过 |
+| Frontend | ESLint、Vue typecheck 通过；252 个文件、1841 个测试通过；production build 通过 |
+| PostgreSQL integration | PostgreSQL 18.1 + Redis 8.4 实跑 migration、opening/immutability、refund trigger、并发一次性退款和 repository 套件，包耗时 `39.373s` |
+| 本地升级库 | migration/FK/check/unique index/trigger 各 1；2 个 User、2 条 opening 流水；无非法 refund link；对账差异用户数 0 |
+| Runtime 黑盒 | 临时无宿主端口实例 healthy，`/health` 返回 ok；未认证的 user/admin 钱包请求均 HTTP 401；验收后临时实例已移除 |
+| 稳定实例 | 现有 `sub2api:m2-scope-closure` 实例全程 healthy，未提前切换未完成的 M6 分支 |
+| 镜像 | `sub2api:m6-admin-wallet`，digest `sha256:d34ceec2902ed37a6861e39a12b4dfc4267341b782e8f0680dca02dd33068f5e`，44730339 bytes |
+| Git | Ent/Wire generate 通过；`git diff --check` 通过（仅 CRLF 提示） |
+
+### 剩余边界与下一步
+
+* Gateway usage 尚未切入 wallet transaction，完整收费闭环和 scheduled reconciliation 仍属 M6 后续任务。
+* 公开注册由 M2 保持关闭；若未来恢复，非零默认余额必须通过开账事务，不能直接写 `users.balance`。
+* M6 保持 `in_progress`。按计划进入 M6.3：新增 `user_model_permissions` 并在请求前执行用户与模型授权。之后依次完成 API Key HMAC 摘要、上游凭据加密、对账告警和 Composite 精确目标 Group 路由。
+
+## 19. 后续记录模板
 
 每次工作结束追加一节，不覆盖历史记录。
 

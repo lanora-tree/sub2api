@@ -25,12 +25,21 @@ func TestDeriveAuditAction(t *testing.T) {
 		{"DELETE", "/api/v1/admin/backups/:id", "admin.backups.delete"},
 		{"GET", "/api/v1/admin/users/:id/api-keys", "admin.users.api_keys.read"},
 		{"POST", "/api/v1/admin/redeem-codes/batch", "admin.redeem_codes.batch.create"},
+		{"GET", "/api/v1/admin/users/:id/wallet", "admin.users.wallet.read"},
+		{"POST", "/api/v1/admin/users/:id/wallet/transactions", "admin.users.wallet.transactions.create"},
+		{"POST", "/api/v1/admin/users/:id/wallet/refunds", "admin.users.wallet.refunds.create"},
 	}
 	for _, tc := range cases {
 		if got := deriveAuditAction(tc.method, tc.path); got != tc.want {
 			t.Fatalf("deriveAuditAction(%q, %q) = %q, want %q", tc.method, tc.path, got, tc.want)
 		}
 	}
+}
+
+func TestWalletAuditActionOverrides(t *testing.T) {
+	require.Equal(t, "admin.users.wallet.transaction.create", auditActionOverrides["POST /api/v1/admin/users/:id/balance"])
+	require.Equal(t, "admin.users.wallet.transaction.create", auditActionOverrides["POST /api/v1/admin/users/:id/wallet/transactions"])
+	require.Equal(t, "admin.users.wallet.refund.create", auditActionOverrides["POST /api/v1/admin/users/:id/wallet/refunds"])
 }
 
 type auditCaptureRepository struct {
