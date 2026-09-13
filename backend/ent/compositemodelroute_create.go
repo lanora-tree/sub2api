@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/Wei-Shaw/sub2api/ent/compositemodelroute"
 	"github.com/Wei-Shaw/sub2api/ent/group"
+	"github.com/Wei-Shaw/sub2api/ent/user"
 )
 
 // CompositeModelRouteCreate is the builder for creating a CompositeModelRoute entity.
@@ -178,6 +179,21 @@ func (_c *CompositeModelRouteCreate) SetNillableNotes(v *string) *CompositeModel
 // SetGroup sets the "group" edge to the Group entity.
 func (_c *CompositeModelRouteCreate) SetGroup(v *Group) *CompositeModelRouteCreate {
 	return _c.SetGroupID(v.ID)
+}
+
+// AddPermittedUserIDs adds the "permitted_users" edge to the User entity by IDs.
+func (_c *CompositeModelRouteCreate) AddPermittedUserIDs(ids ...int64) *CompositeModelRouteCreate {
+	_c.mutation.AddPermittedUserIDs(ids...)
+	return _c
+}
+
+// AddPermittedUsers adds the "permitted_users" edges to the User entity.
+func (_c *CompositeModelRouteCreate) AddPermittedUsers(v ...*User) *CompositeModelRouteCreate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddPermittedUserIDs(ids...)
 }
 
 // Mutation returns the CompositeModelRouteMutation object of the builder.
@@ -404,6 +420,26 @@ func (_c *CompositeModelRouteCreate) createSpec() (*CompositeModelRoute, *sqlgra
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.GroupID = nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.PermittedUsersIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   compositemodelroute.PermittedUsersTable,
+			Columns: compositemodelroute.PermittedUsersPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(user.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		createE := &UserModelPermissionCreate{config: _c.config, mutation: newUserModelPermissionMutation(_c.config, OpCreate)}
+		createE.defaults()
+		_, specE := createE.createSpec()
+		edge.Target.Fields = specE.Fields
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec

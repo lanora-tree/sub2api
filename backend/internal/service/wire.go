@@ -817,6 +817,17 @@ func ProvideAPIKeyService(
 	return svc
 }
 
+// ProvideCompositeRouteResolver wires the authoritative permission service into
+// the shared resolver used by every Gateway protocol surface.
+func ProvideCompositeRouteResolver(
+	repo CompositeModelRouteRepository,
+	permissionService *UserModelPermissionService,
+) *CompositeRouteResolver {
+	resolver := NewCompositeRouteResolver(repo)
+	resolver.SetPermissionService(permissionService)
+	return resolver
+}
+
 // ProviderSet is the Wire provider set for all services
 var ProviderSet = wire.NewSet(
 	// Core services
@@ -827,7 +838,8 @@ var ProviderSet = wire.NewSet(
 	ProvideAPIKeyAuthCacheInvalidator,
 	ProvideAuthCacheInvalidationWorker,
 	NewGroupService,
-	NewCompositeRouteResolver,
+	NewUserModelPermissionService,
+	ProvideCompositeRouteResolver,
 	NewAccountService,
 	NewProxyService,
 	NewRedeemService,

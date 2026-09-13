@@ -14,6 +14,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/announcementread"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/authidentity"
+	"github.com/Wei-Shaw/sub2api/ent/compositemodelroute"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
 	"github.com/Wei-Shaw/sub2api/ent/pendingauthsession"
@@ -457,6 +458,21 @@ func (_c *UserCreate) AddAllowedGroups(v ...*Group) *UserCreate {
 		ids[i] = v[i].ID
 	}
 	return _c.AddAllowedGroupIDs(ids...)
+}
+
+// AddModelRouteIDs adds the "model_routes" edge to the CompositeModelRoute entity by IDs.
+func (_c *UserCreate) AddModelRouteIDs(ids ...int64) *UserCreate {
+	_c.mutation.AddModelRouteIDs(ids...)
+	return _c
+}
+
+// AddModelRoutes adds the "model_routes" edges to the CompositeModelRoute entity.
+func (_c *UserCreate) AddModelRoutes(v ...*CompositeModelRoute) *UserCreate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddModelRouteIDs(ids...)
 }
 
 // AddUsageLogIDs adds the "usage_logs" edge to the UsageLog entity by IDs.
@@ -1019,6 +1035,26 @@ func (_c *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		createE := &UserAllowedGroupCreate{config: _c.config, mutation: newUserAllowedGroupMutation(_c.config, OpCreate)}
+		createE.defaults()
+		_, specE := createE.createSpec()
+		edge.Target.Fields = specE.Fields
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ModelRoutesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   user.ModelRoutesTable,
+			Columns: user.ModelRoutesPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(compositemodelroute.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		createE := &UserModelPermissionCreate{config: _c.config, mutation: newUserModelPermissionMutation(_c.config, OpCreate)}
 		createE.defaults()
 		_, specE := createE.createSpec()
 		edge.Target.Fields = specE.Fields

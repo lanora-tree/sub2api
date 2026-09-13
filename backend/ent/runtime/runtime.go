@@ -43,6 +43,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/userallowedgroup"
 	"github.com/Wei-Shaw/sub2api/ent/userattributedefinition"
 	"github.com/Wei-Shaw/sub2api/ent/userattributevalue"
+	"github.com/Wei-Shaw/sub2api/ent/usermodelpermission"
 	"github.com/Wei-Shaw/sub2api/ent/userplatformquota"
 	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
 	"github.com/Wei-Shaw/sub2api/ent/wallettransaction"
@@ -2384,6 +2385,22 @@ func init() {
 	userattributevalueDescValue := userattributevalueFields[2].Descriptor()
 	// userattributevalue.DefaultValue holds the default value on creation for the value field.
 	userattributevalue.DefaultValue = userattributevalueDescValue.Default.(string)
+	usermodelpermissionFields := schema.UserModelPermission{}.Fields()
+	_ = usermodelpermissionFields
+	// usermodelpermissionDescEnabled is the schema descriptor for enabled field.
+	usermodelpermissionDescEnabled := usermodelpermissionFields[2].Descriptor()
+	// usermodelpermission.DefaultEnabled holds the default value on creation for the enabled field.
+	usermodelpermission.DefaultEnabled = usermodelpermissionDescEnabled.Default.(bool)
+	// usermodelpermissionDescCreatedAt is the schema descriptor for created_at field.
+	usermodelpermissionDescCreatedAt := usermodelpermissionFields[4].Descriptor()
+	// usermodelpermission.DefaultCreatedAt holds the default value on creation for the created_at field.
+	usermodelpermission.DefaultCreatedAt = usermodelpermissionDescCreatedAt.Default.(func() time.Time)
+	// usermodelpermissionDescUpdatedAt is the schema descriptor for updated_at field.
+	usermodelpermissionDescUpdatedAt := usermodelpermissionFields[5].Descriptor()
+	// usermodelpermission.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	usermodelpermission.DefaultUpdatedAt = usermodelpermissionDescUpdatedAt.Default.(func() time.Time)
+	// usermodelpermission.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	usermodelpermission.UpdateDefaultUpdatedAt = usermodelpermissionDescUpdatedAt.UpdateDefault.(func() time.Time)
 	userplatformquotaMixin := schema.UserPlatformQuota{}.Mixin()
 	userplatformquotaMixinHooks1 := userplatformquotaMixin[1].Hooks()
 	userplatformquota.Hooks[0] = userplatformquotaMixinHooks1[0]

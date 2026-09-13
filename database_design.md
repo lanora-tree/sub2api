@@ -150,14 +150,16 @@ EXCLUDE USING gist (
 
 | 字段 | 类型 | 约束与说明 |
 | --- | --- | --- |
-| `user_id` | BIGINT | FK `users(id)` |
-| `route_id` | BIGINT | FK `composite_model_routes(id)` |
+| `user_id` | BIGINT | FK `users(id)`，用户删除时级联清理 |
+| `route_id` | BIGINT | FK `composite_model_routes(id)`，`ON DELETE RESTRICT` |
 | `enabled` | BOOLEAN | 显式允许或暂停 |
-| `created_by` | BIGINT | Admin User ID |
+| `created_by` | BIGINT | Admin User ID，FK `users(id)`，`ON DELETE RESTRICT` |
 | `created_at` | TIMESTAMPTZ | 创建时间 |
 | `updated_at` | TIMESTAMPTZ | 更新时间 |
 
 Primary Key 为 `(user_id, route_id)`。增加 `(route_id, enabled)` 索引。新用户默认没有记录并被拒绝。已被权限引用的 Route，其 public model、Provider、target Group、upstream model 和 endpoint 视为不可变；改变这些授权语义时必须创建新 Route、重新授权并停用旧 Route，避免原权限静默指向另一成本池或模型。
+
+M6.3 的完整替换使用启用 route ID 集合的稳定 SHA-256 作为不透明版本，并在同一用户维度取得事务级 advisory lock 后比较版本、校验 Route、停用旧行和 upsert 新行。历史行不物理删除；重新启用保留最初 `created_by`，当前操作者由审计日志记录。当前有效性还要求 Route enabled/未删除/exact，所属 Group enabled/未删除且为 Composite。后续增加 `target_group_id` 时必须用 forward migration 扩展 Route 语义不可变 trigger，不能改写已发布的 migration 242。
 
 ### 4.5 `external_recharge_orders`
 

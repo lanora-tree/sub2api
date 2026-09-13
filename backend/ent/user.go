@@ -87,6 +87,8 @@ type UserEdges struct {
 	AnnouncementReads []*AnnouncementRead `json:"announcement_reads,omitempty"`
 	// AllowedGroups holds the value of the allowed_groups edge.
 	AllowedGroups []*Group `json:"allowed_groups,omitempty"`
+	// ModelRoutes holds the value of the model_routes edge.
+	ModelRoutes []*CompositeModelRoute `json:"model_routes,omitempty"`
 	// UsageLogs holds the value of the usage_logs edge.
 	UsageLogs []*UsageLog `json:"usage_logs,omitempty"`
 	// AttributeValues holds the value of the attribute_values edge.
@@ -107,9 +109,11 @@ type UserEdges struct {
 	OperatedWalletTransactions []*WalletTransaction `json:"operated_wallet_transactions,omitempty"`
 	// UserAllowedGroups holds the value of the user_allowed_groups edge.
 	UserAllowedGroups []*UserAllowedGroup `json:"user_allowed_groups,omitempty"`
+	// ModelPermissions holds the value of the model_permissions edge.
+	ModelPermissions []*UserModelPermission `json:"model_permissions,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [16]bool
+	loadedTypes [18]bool
 }
 
 // APIKeysOrErr returns the APIKeys value or an error if the edge
@@ -166,10 +170,19 @@ func (e UserEdges) AllowedGroupsOrErr() ([]*Group, error) {
 	return nil, &NotLoadedError{edge: "allowed_groups"}
 }
 
+// ModelRoutesOrErr returns the ModelRoutes value or an error if the edge
+// was not loaded in eager-loading.
+func (e UserEdges) ModelRoutesOrErr() ([]*CompositeModelRoute, error) {
+	if e.loadedTypes[6] {
+		return e.ModelRoutes, nil
+	}
+	return nil, &NotLoadedError{edge: "model_routes"}
+}
+
 // UsageLogsOrErr returns the UsageLogs value or an error if the edge
 // was not loaded in eager-loading.
 func (e UserEdges) UsageLogsOrErr() ([]*UsageLog, error) {
-	if e.loadedTypes[6] {
+	if e.loadedTypes[7] {
 		return e.UsageLogs, nil
 	}
 	return nil, &NotLoadedError{edge: "usage_logs"}
@@ -178,7 +191,7 @@ func (e UserEdges) UsageLogsOrErr() ([]*UsageLog, error) {
 // AttributeValuesOrErr returns the AttributeValues value or an error if the edge
 // was not loaded in eager-loading.
 func (e UserEdges) AttributeValuesOrErr() ([]*UserAttributeValue, error) {
-	if e.loadedTypes[7] {
+	if e.loadedTypes[8] {
 		return e.AttributeValues, nil
 	}
 	return nil, &NotLoadedError{edge: "attribute_values"}
@@ -187,7 +200,7 @@ func (e UserEdges) AttributeValuesOrErr() ([]*UserAttributeValue, error) {
 // PromoCodeUsagesOrErr returns the PromoCodeUsages value or an error if the edge
 // was not loaded in eager-loading.
 func (e UserEdges) PromoCodeUsagesOrErr() ([]*PromoCodeUsage, error) {
-	if e.loadedTypes[8] {
+	if e.loadedTypes[9] {
 		return e.PromoCodeUsages, nil
 	}
 	return nil, &NotLoadedError{edge: "promo_code_usages"}
@@ -196,7 +209,7 @@ func (e UserEdges) PromoCodeUsagesOrErr() ([]*PromoCodeUsage, error) {
 // PaymentOrdersOrErr returns the PaymentOrders value or an error if the edge
 // was not loaded in eager-loading.
 func (e UserEdges) PaymentOrdersOrErr() ([]*PaymentOrder, error) {
-	if e.loadedTypes[9] {
+	if e.loadedTypes[10] {
 		return e.PaymentOrders, nil
 	}
 	return nil, &NotLoadedError{edge: "payment_orders"}
@@ -205,7 +218,7 @@ func (e UserEdges) PaymentOrdersOrErr() ([]*PaymentOrder, error) {
 // AuthIdentitiesOrErr returns the AuthIdentities value or an error if the edge
 // was not loaded in eager-loading.
 func (e UserEdges) AuthIdentitiesOrErr() ([]*AuthIdentity, error) {
-	if e.loadedTypes[10] {
+	if e.loadedTypes[11] {
 		return e.AuthIdentities, nil
 	}
 	return nil, &NotLoadedError{edge: "auth_identities"}
@@ -214,7 +227,7 @@ func (e UserEdges) AuthIdentitiesOrErr() ([]*AuthIdentity, error) {
 // PendingAuthSessionsOrErr returns the PendingAuthSessions value or an error if the edge
 // was not loaded in eager-loading.
 func (e UserEdges) PendingAuthSessionsOrErr() ([]*PendingAuthSession, error) {
-	if e.loadedTypes[11] {
+	if e.loadedTypes[12] {
 		return e.PendingAuthSessions, nil
 	}
 	return nil, &NotLoadedError{edge: "pending_auth_sessions"}
@@ -223,7 +236,7 @@ func (e UserEdges) PendingAuthSessionsOrErr() ([]*PendingAuthSession, error) {
 // PlatformQuotasOrErr returns the PlatformQuotas value or an error if the edge
 // was not loaded in eager-loading.
 func (e UserEdges) PlatformQuotasOrErr() ([]*UserPlatformQuota, error) {
-	if e.loadedTypes[12] {
+	if e.loadedTypes[13] {
 		return e.PlatformQuotas, nil
 	}
 	return nil, &NotLoadedError{edge: "platform_quotas"}
@@ -232,7 +245,7 @@ func (e UserEdges) PlatformQuotasOrErr() ([]*UserPlatformQuota, error) {
 // WalletTransactionsOrErr returns the WalletTransactions value or an error if the edge
 // was not loaded in eager-loading.
 func (e UserEdges) WalletTransactionsOrErr() ([]*WalletTransaction, error) {
-	if e.loadedTypes[13] {
+	if e.loadedTypes[14] {
 		return e.WalletTransactions, nil
 	}
 	return nil, &NotLoadedError{edge: "wallet_transactions"}
@@ -241,7 +254,7 @@ func (e UserEdges) WalletTransactionsOrErr() ([]*WalletTransaction, error) {
 // OperatedWalletTransactionsOrErr returns the OperatedWalletTransactions value or an error if the edge
 // was not loaded in eager-loading.
 func (e UserEdges) OperatedWalletTransactionsOrErr() ([]*WalletTransaction, error) {
-	if e.loadedTypes[14] {
+	if e.loadedTypes[15] {
 		return e.OperatedWalletTransactions, nil
 	}
 	return nil, &NotLoadedError{edge: "operated_wallet_transactions"}
@@ -250,10 +263,19 @@ func (e UserEdges) OperatedWalletTransactionsOrErr() ([]*WalletTransaction, erro
 // UserAllowedGroupsOrErr returns the UserAllowedGroups value or an error if the edge
 // was not loaded in eager-loading.
 func (e UserEdges) UserAllowedGroupsOrErr() ([]*UserAllowedGroup, error) {
-	if e.loadedTypes[15] {
+	if e.loadedTypes[16] {
 		return e.UserAllowedGroups, nil
 	}
 	return nil, &NotLoadedError{edge: "user_allowed_groups"}
+}
+
+// ModelPermissionsOrErr returns the ModelPermissions value or an error if the edge
+// was not loaded in eager-loading.
+func (e UserEdges) ModelPermissionsOrErr() ([]*UserModelPermission, error) {
+	if e.loadedTypes[17] {
+		return e.ModelPermissions, nil
+	}
+	return nil, &NotLoadedError{edge: "model_permissions"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -491,6 +513,11 @@ func (_m *User) QueryAllowedGroups() *GroupQuery {
 	return NewUserClient(_m.config).QueryAllowedGroups(_m)
 }
 
+// QueryModelRoutes queries the "model_routes" edge of the User entity.
+func (_m *User) QueryModelRoutes() *CompositeModelRouteQuery {
+	return NewUserClient(_m.config).QueryModelRoutes(_m)
+}
+
 // QueryUsageLogs queries the "usage_logs" edge of the User entity.
 func (_m *User) QueryUsageLogs() *UsageLogQuery {
 	return NewUserClient(_m.config).QueryUsageLogs(_m)
@@ -539,6 +566,11 @@ func (_m *User) QueryOperatedWalletTransactions() *WalletTransactionQuery {
 // QueryUserAllowedGroups queries the "user_allowed_groups" edge of the User entity.
 func (_m *User) QueryUserAllowedGroups() *UserAllowedGroupQuery {
 	return NewUserClient(_m.config).QueryUserAllowedGroups(_m)
+}
+
+// QueryModelPermissions queries the "model_permissions" edge of the User entity.
+func (_m *User) QueryModelPermissions() *UserModelPermissionQuery {
+	return NewUserClient(_m.config).QueryModelPermissions(_m)
 }
 
 // Update returns a builder for updating this User.

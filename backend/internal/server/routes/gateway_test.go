@@ -357,7 +357,7 @@ func TestGatewayRoutesCompositeVideoGenerationAllowed(t *testing.T) {
 	require.NotContains(t, w.Body.String(), "not supported")
 }
 
-func TestGatewayRoutesCompositeOpenAIOnlyEndpointsRequireOpenAITarget(t *testing.T) {
+func TestGatewayRoutesCompositeImplicitModelsAreDeniedBeforeEndpointDispatch(t *testing.T) {
 	router := newGatewayRoutesTestRouter(service.PlatformComposite)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/embeddings", strings.NewReader(`{"model":"gemini-2.5-pro","input":"hello"}`))
@@ -365,14 +365,16 @@ func TestGatewayRoutesCompositeOpenAIOnlyEndpointsRequireOpenAITarget(t *testing
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
-	require.Equal(t, http.StatusNotFound, w.Code)
+	require.Equal(t, http.StatusForbidden, w.Code)
+	require.Contains(t, w.Body.String(), "MODEL_NOT_ALLOWED")
 
 	req = httptest.NewRequest(http.MethodPost, "/v1/embeddings", strings.NewReader(`{"model":"text-embedding-3-small","input":"hello"}`))
 	req.Header.Set("Content-Type", "application/json")
 	w = httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
-	require.NotEqual(t, http.StatusNotFound, w.Code)
+	require.Equal(t, http.StatusForbidden, w.Code)
+	require.Contains(t, w.Body.String(), "MODEL_NOT_ALLOWED")
 }
 
 func TestGatewayRoutesGrokAllowsCLICompatibilityEntrypoints(t *testing.T) {

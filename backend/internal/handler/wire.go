@@ -178,9 +178,11 @@ func ProvideAdminUserHandler(
 	userService *service.UserService,
 	settingService *service.SettingService,
 	walletService *service.WalletService,
+	modelPermissionService *service.UserModelPermissionService,
 ) *admin.UserHandler {
 	h := admin.NewUserHandler(adminService, concurrencyService, userPlatformQuotaRepo, billingCache, totpService, userService, settingService)
 	h.SetWalletService(walletService)
+	h.SetModelPermissionService(modelPermissionService)
 	return h
 }
 

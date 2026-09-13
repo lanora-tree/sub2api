@@ -4,6 +4,7 @@ package ent
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"math"
 
@@ -15,17 +16,21 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/compositemodelroute"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
+	"github.com/Wei-Shaw/sub2api/ent/user"
+	"github.com/Wei-Shaw/sub2api/ent/usermodelpermission"
 )
 
 // CompositeModelRouteQuery is the builder for querying CompositeModelRoute entities.
 type CompositeModelRouteQuery struct {
 	config
-	ctx        *QueryContext
-	order      []compositemodelroute.OrderOption
-	inters     []Interceptor
-	predicates []predicate.CompositeModelRoute
-	withGroup  *GroupQuery
-	modifiers  []func(*sql.Selector)
+	ctx                  *QueryContext
+	order                []compositemodelroute.OrderOption
+	inters               []Interceptor
+	predicates           []predicate.CompositeModelRoute
+	withGroup            *GroupQuery
+	withPermittedUsers   *UserQuery
+	withModelPermissions *UserModelPermissionQuery
+	modifiers            []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -77,6 +82,50 @@ func (_q *CompositeModelRouteQuery) QueryGroup() *GroupQuery {
 			sqlgraph.From(compositemodelroute.Table, compositemodelroute.FieldID, selector),
 			sqlgraph.To(group.Table, group.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, false, compositemodelroute.GroupTable, compositemodelroute.GroupColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryPermittedUsers chains the current query on the "permitted_users" edge.
+func (_q *CompositeModelRouteQuery) QueryPermittedUsers() *UserQuery {
+	query := (&UserClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(compositemodelroute.Table, compositemodelroute.FieldID, selector),
+			sqlgraph.To(user.Table, user.FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, true, compositemodelroute.PermittedUsersTable, compositemodelroute.PermittedUsersPrimaryKey...),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryModelPermissions chains the current query on the "model_permissions" edge.
+func (_q *CompositeModelRouteQuery) QueryModelPermissions() *UserModelPermissionQuery {
+	query := (&UserModelPermissionClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(compositemodelroute.Table, compositemodelroute.FieldID, selector),
+			sqlgraph.To(usermodelpermission.Table, usermodelpermission.RouteColumn),
+			sqlgraph.Edge(sqlgraph.O2M, true, compositemodelroute.ModelPermissionsTable, compositemodelroute.ModelPermissionsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -271,12 +320,14 @@ func (_q *CompositeModelRouteQuery) Clone() *CompositeModelRouteQuery {
 		return nil
 	}
 	return &CompositeModelRouteQuery{
-		config:     _q.config,
-		ctx:        _q.ctx.Clone(),
-		order:      append([]compositemodelroute.OrderOption{}, _q.order...),
-		inters:     append([]Interceptor{}, _q.inters...),
-		predicates: append([]predicate.CompositeModelRoute{}, _q.predicates...),
-		withGroup:  _q.withGroup.Clone(),
+		config:               _q.config,
+		ctx:                  _q.ctx.Clone(),
+		order:                append([]compositemodelroute.OrderOption{}, _q.order...),
+		inters:               append([]Interceptor{}, _q.inters...),
+		predicates:           append([]predicate.CompositeModelRoute{}, _q.predicates...),
+		withGroup:            _q.withGroup.Clone(),
+		withPermittedUsers:   _q.withPermittedUsers.Clone(),
+		withModelPermissions: _q.withModelPermissions.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -291,6 +342,28 @@ func (_q *CompositeModelRouteQuery) WithGroup(opts ...func(*GroupQuery)) *Compos
 		opt(query)
 	}
 	_q.withGroup = query
+	return _q
+}
+
+// WithPermittedUsers tells the query-builder to eager-load the nodes that are connected to
+// the "permitted_users" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *CompositeModelRouteQuery) WithPermittedUsers(opts ...func(*UserQuery)) *CompositeModelRouteQuery {
+	query := (&UserClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withPermittedUsers = query
+	return _q
+}
+
+// WithModelPermissions tells the query-builder to eager-load the nodes that are connected to
+// the "model_permissions" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *CompositeModelRouteQuery) WithModelPermissions(opts ...func(*UserModelPermissionQuery)) *CompositeModelRouteQuery {
+	query := (&UserModelPermissionClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withModelPermissions = query
 	return _q
 }
 
@@ -372,8 +445,10 @@ func (_q *CompositeModelRouteQuery) sqlAll(ctx context.Context, hooks ...queryHo
 	var (
 		nodes       = []*CompositeModelRoute{}
 		_spec       = _q.querySpec()
-		loadedTypes = [1]bool{
+		loadedTypes = [3]bool{
 			_q.withGroup != nil,
+			_q.withPermittedUsers != nil,
+			_q.withModelPermissions != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -400,6 +475,22 @@ func (_q *CompositeModelRouteQuery) sqlAll(ctx context.Context, hooks ...queryHo
 	if query := _q.withGroup; query != nil {
 		if err := _q.loadGroup(ctx, query, nodes, nil,
 			func(n *CompositeModelRoute, e *Group) { n.Edges.Group = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withPermittedUsers; query != nil {
+		if err := _q.loadPermittedUsers(ctx, query, nodes,
+			func(n *CompositeModelRoute) { n.Edges.PermittedUsers = []*User{} },
+			func(n *CompositeModelRoute, e *User) { n.Edges.PermittedUsers = append(n.Edges.PermittedUsers, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withModelPermissions; query != nil {
+		if err := _q.loadModelPermissions(ctx, query, nodes,
+			func(n *CompositeModelRoute) { n.Edges.ModelPermissions = []*UserModelPermission{} },
+			func(n *CompositeModelRoute, e *UserModelPermission) {
+				n.Edges.ModelPermissions = append(n.Edges.ModelPermissions, e)
+			}); err != nil {
 			return nil, err
 		}
 	}
@@ -432,6 +523,97 @@ func (_q *CompositeModelRouteQuery) loadGroup(ctx context.Context, query *GroupQ
 		for i := range nodes {
 			assign(nodes[i], n)
 		}
+	}
+	return nil
+}
+func (_q *CompositeModelRouteQuery) loadPermittedUsers(ctx context.Context, query *UserQuery, nodes []*CompositeModelRoute, init func(*CompositeModelRoute), assign func(*CompositeModelRoute, *User)) error {
+	edgeIDs := make([]driver.Value, len(nodes))
+	byID := make(map[int64]*CompositeModelRoute)
+	nids := make(map[int64]map[*CompositeModelRoute]struct{})
+	for i, node := range nodes {
+		edgeIDs[i] = node.ID
+		byID[node.ID] = node
+		if init != nil {
+			init(node)
+		}
+	}
+	query.Where(func(s *sql.Selector) {
+		joinT := sql.Table(compositemodelroute.PermittedUsersTable)
+		s.Join(joinT).On(s.C(user.FieldID), joinT.C(compositemodelroute.PermittedUsersPrimaryKey[0]))
+		s.Where(sql.InValues(joinT.C(compositemodelroute.PermittedUsersPrimaryKey[1]), edgeIDs...))
+		columns := s.SelectedColumns()
+		s.Select(joinT.C(compositemodelroute.PermittedUsersPrimaryKey[1]))
+		s.AppendSelect(columns...)
+		s.SetDistinct(false)
+	})
+	if err := query.prepareQuery(ctx); err != nil {
+		return err
+	}
+	qr := QuerierFunc(func(ctx context.Context, q Query) (Value, error) {
+		return query.sqlAll(ctx, func(_ context.Context, spec *sqlgraph.QuerySpec) {
+			assign := spec.Assign
+			values := spec.ScanValues
+			spec.ScanValues = func(columns []string) ([]any, error) {
+				values, err := values(columns[1:])
+				if err != nil {
+					return nil, err
+				}
+				return append([]any{new(sql.NullInt64)}, values...), nil
+			}
+			spec.Assign = func(columns []string, values []any) error {
+				outValue := values[0].(*sql.NullInt64).Int64
+				inValue := values[1].(*sql.NullInt64).Int64
+				if nids[inValue] == nil {
+					nids[inValue] = map[*CompositeModelRoute]struct{}{byID[outValue]: {}}
+					return assign(columns[1:], values[1:])
+				}
+				nids[inValue][byID[outValue]] = struct{}{}
+				return nil
+			}
+		})
+	})
+	neighbors, err := withInterceptors[[]*User](ctx, query, qr, query.inters)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected "permitted_users" node returned %v`, n.ID)
+		}
+		for kn := range nodes {
+			assign(kn, n)
+		}
+	}
+	return nil
+}
+func (_q *CompositeModelRouteQuery) loadModelPermissions(ctx context.Context, query *UserModelPermissionQuery, nodes []*CompositeModelRoute, init func(*CompositeModelRoute), assign func(*CompositeModelRoute, *UserModelPermission)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int64]*CompositeModelRoute)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(usermodelpermission.FieldRouteID)
+	}
+	query.Where(predicate.UserModelPermission(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(compositemodelroute.ModelPermissionsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.RouteID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "route_id" returned %v for node %v`, fk, n)
+		}
+		assign(node, n)
 	}
 	return nil
 }

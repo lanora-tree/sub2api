@@ -59,6 +59,36 @@ payloads, and apply the configured `upstream_model` before dispatch.
 Codex model manifest requests reuse the existing OpenAI account selection and
 failover path within the Composite group.
 
+## Per-user Model Authorization
+
+Composite model execution is default-deny. The gateway accepts a model-bearing
+request only when it resolves to an enabled exact route and the authenticated
+user has an enabled permission for that route. Built-in detection and account
+ownership can still explain legacy routing behavior, but they are not an
+authorization decision and are rejected on the protected gateway path.
+
+Administrators manage the complete enabled set through:
+
+- `GET /api/v1/admin/users/:id/model-permissions`
+- `PUT /api/v1/admin/users/:id/model-permissions`
+
+GET returns a strong `ETag`. PUT requires that value in `If-Match`, performs an
+atomic full replacement, and returns 409 if another administrator changed the
+set first. An empty `route_ids` array revokes all access. Route and other
+BIGINT identifiers are JSON strings so browser clients do not lose precision.
+Permission writes require administrator step-up authentication and are audited.
+
+The models endpoints return only enabled routes authorized for the current
+user. Disabled routes or groups disappear immediately, while temporary account
+cooldown does not change the catalog. Permission database failures fail closed
+with `MODEL_PERMISSION_UNAVAILABLE`; an unassigned, implicit, or disabled model
+returns `MODEL_NOT_ALLOWED` before an upstream concurrency slot is acquired.
+
+After any permission references a route, its authorization-bearing fields
+cannot be edited in place. Create a replacement route, update user permissions,
+then disable the old route. Operational fields such as priority, enabled state,
+and notes remain editable.
+
 ## Built-In Detection
 
 Composite routing detects common public model IDs and provider-prefixed IDs:
@@ -112,10 +142,10 @@ keys per provider.
    named in each route. Composite routing does not create pricing records.
 6. Create a subscription payment plan for the composite group.
 
-The same composite group can also rely on built-in detection for standard model
-names such as `gpt-*`, `claude-*`, `gemini-*`, and `grok-*`. Explicit routes are
-recommended for bundled plan aliases because they make endpoint, provider, and
-upstream model attribution reviewable in the admin UI.
+Built-in detection remains useful for route preview and legacy resolution, but
+an authorized customer-facing request must use an explicit exact route. Create
+explicit routes even when the public name is a standard `gpt-*`, `claude-*`,
+`gemini-*`, or `grok-*` identifier.
 
 ## Limits
 

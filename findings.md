@@ -15,6 +15,7 @@ Sub2API 有条件适合作为本项目底座。它对 Codex、OpenAI Compatible 
 1. 上游管理端在任何管理写操作前强制管理员本人确认 `v2026.06.10` 合规声明。管理员已在 UI 完成确认，数据库记录版本与用户；自动化没有代签或绕过门禁。
 2. 正式 Fork `https://github.com/lanora-tree/sub2api` 已创建；本地 `origin` 与 `upstream` 已按项目规则配置，原 Fork 阻塞关闭。
 3. `upstream/main` 于 2026-09-12 开始 M6 前重新抓取，仍为 `4726bdd08b6201d426a80529b79be123a4008d20`，已领先审计提交 349 个提交。M6 继续从已验收 M2 基线开发；上游同步必须在专用分支审阅，不能静默改变审计基线。
+   2026-09-13 开始 M6.3 时再次抓取，上游已前进到 `bdb42e22f81fcb633ff0a060961211dd2bcb515b`，固定基线落后 399 个提交；上游 migration 最大编号仍为 238，本分支顺序使用 242，基线与同步策略不变。
 4. Windows CRLF 检出会使部分 POSIX 精确行匹配部署测试误报。实际配置语义未失败；临时 LF 副本全部通过。项目已补充 `.gitattributes`，保证后续检出一致。
 5. M0 使用本地临时 OpenAI Compatible mock 验证 `gpt-5.4` 模型列表、非流式与 Streaming。两条请求均落入 `usage_logs` 并按上游原始 USD 语义扣费；模拟账号随后设为 inactive，临时容器和脚本已移除。
 
@@ -362,3 +363,12 @@ README_CN 另有以下项目声明：服务条款风险、仅供技术学习研�
 4. 通用 Admin User 创建被限制为零初始余额，通用更新不能携带 balance，旧 float 型 `AdminService.UpdateUserBalance` 已移除，避免内部或后台 CRUD 绕过流水。公开注册目前由 M2 关闭；未来若恢复且配置非零默认余额，必须先补齐同事务开账。
 5. 真实 PostgreSQL 18 已验证 migration 幂等、schema、trigger、不同请求键的并发退款唯一性和对账。本地升级库 migration checksum 为 64 位，2 个现有测试用户仍只有 2 条 opening 流水，对账差异为零。
 6. Gateway usage 仍沿用既有结算路径，尚未生成 `wallet_transactions` usage 行；不能把 M6.2 解释为完整收费闭环。下一顺序项为用户模型权限，usage 原子结算和定时对账仍需在 M6 后续子任务完成。
+
+## 23. M6.3 实施确认
+
+1. `user_model_permissions` 以 `(user_id, route_id)` 为稳定授权身份。启用集合的 SHA-256 版本配合用户维度事务 advisory lock，可让无独立 revision 行的空集合也参与乐观并发控制；真实 PostgreSQL 并发测试验证同一版本只能有一个完整替换提交。
+2. 权限的“有效”与“已配置”必须分开。历史行可保持 enabled，但 Route 或 Composite Group 停用后 runtime 与 Admin snapshot 的 `effective` 都为 false；恢复配置后无需重建授权记录。
+3. Route 是权限引用对象后，授权语义不能原地漂移。Migration 242 用数据库 trigger 保护现有语义字段，同时保留 enabled、priority 和 notes 的运维修改；未来加入 `target_group_id` 时必须另发 migration 扩展 trigger。
+4. Composite detector 和账号模型 ownership 只是路由提示，不是授权身份。Gateway 因此只接受显式 exact Route；模型目录也直接使用权限 Route，而不是先暴露账号能力再让请求阶段拒绝。
+5. OpenAI Images 会在 handler 内把缺失 model 默认成 `gpt-image-2`。如果权限中间件只看原 body，会形成默认模型绕过；M6.3 已在中间件采用相同默认值再授权，并有回归测试。
+6. 当前 Route 仍只锁定 platform，同平台内的 Codex Subscription 与 Official API 成本池隔离尚未成立；这也是 M6.3 候选不切换稳定实例的主要原因之一。M6 后续仍需 `target_group_id`、only-explicit、API Key HMAC、credential 加密、usage 钱包结算和对账告警。

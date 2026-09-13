@@ -1089,13 +1089,25 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 
 	if platform == service.PlatformComposite {
 		availableModels := h.compositeAvailableModels(c.Request.Context(), groupID)
+		authorizedModels, permissionScoped := service.AuthorizedModelIDsFromContext(c.Request.Context())
+		if permissionScoped {
+			availableModels = authorizedModels
+		}
 		if apiKey != nil && apiKey.Group != nil && apiKey.Group.CustomModelsListEnabled() {
-			availableModels = filterModelsByCustomList(availableModels, defaultModelIDsForPlatform(service.PlatformComposite), apiKey.Group.ModelsListConfig.Models)
+			fallbackModels := defaultModelIDsForPlatform(service.PlatformComposite)
+			if permissionScoped {
+				fallbackModels = nil
+			}
+			availableModels = filterModelsByCustomList(availableModels, fallbackModels, apiKey.Group.ModelsListConfig.Models)
 			writeCustomModelsList(c, service.PlatformComposite, availableModels)
 			return
 		}
 		if len(availableModels) > 0 {
 			writeModelsList(c, service.PlatformComposite, availableModels)
+			return
+		}
+		if permissionScoped {
+			writeModelsList(c, service.PlatformComposite, []string{})
 			return
 		}
 		writeModelsList(c, service.PlatformComposite, defaultModelIDsForPlatform(service.PlatformComposite))
@@ -1191,12 +1203,22 @@ func (h *GatewayHandler) codexModelIDsForGroup(ctx context.Context, group *servi
 	}
 	if platform == service.PlatformComposite {
 		availableModels := h.compositeAvailableModels(ctx, groupID)
+		authorizedModels, permissionScoped := service.AuthorizedModelIDsFromContext(ctx)
+		if permissionScoped {
+			availableModels = authorizedModels
+		}
 		fallbackModels := defaultCodexModelIDsForPlatform(service.PlatformComposite)
+		if permissionScoped {
+			fallbackModels = nil
+		}
 		if group.CustomModelsListEnabled() {
 			return filterModelsByCustomList(availableModels, fallbackModels, group.ModelsListConfig.Models)
 		}
 		if len(availableModels) > 0 {
 			return availableModels
+		}
+		if permissionScoped {
+			return []string{}
 		}
 		return fallbackModels
 	}

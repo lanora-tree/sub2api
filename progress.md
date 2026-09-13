@@ -7,9 +7,9 @@
 * 记录日期：2026-09-13 UTC+8
 * 当前阶段：M6 用户、密钥、路由与钱包基础
 * 阶段状态：`in_progress`
-* 当前任务：M6.2 管理员充值、退款、调账与余额查询接入
+* 当前任务：M6.3 用户模型权限已完成；下一项 M6.4 API Key HMAC 摘要
 
-M0、M1 与 M2 已完成。M6.1 已建立 CNY 不可变钱包流水和 Decimal 事务基础，并通过真实 PostgreSQL 并发、幂等、回滚、开账、不可变与对账验收；当前按顺序进入 M6.2。未接入真实 Provider 凭据或真实收费数据。
+M0、M1 与 M2 已完成。M6.1、M6.2 与 M6.3 已依次完成 CNY 钱包基础、管理员钱包操作和 Composite 用户模型权限，并通过真实 PostgreSQL、完整前后端回归和本地升级验收。M6 继续 `in_progress`，下一项为 API Key HMAC 摘要。未接入真实 Provider 凭据或真实收费数据。
 
 ## 2. 里程碑看板
 
@@ -21,7 +21,7 @@ M0、M1 与 M2 已完成。M6.1 已建立 CNY 不可变钱包流水和 Decimal �
 | M3 | Codex Subscription 验证 | `pending` | 等待 M2、M6、M7、合规确认和合法测试账号 |
 | M4 | OpenAI Official API | `pending` | 等待 M2、M6、M7 的基础能力 |
 | M5 | DeepSeek Official API | `pending` | 等待 M2、M6、M7、模型名和价格人工确认 |
-| M6 | 用户、密钥、路由与钱包基础 | `in_progress` | M6.1 已验收；进入 M6.2 管理员钱包接口 |
+| M6 | 用户、密钥、路由与钱包基础 | `in_progress` | M6.1-M6.3 已验收；下一项 M6.4 API Key HMAC 摘要 |
 | M7 | 动态价格与历史快照 | `pending` | 等待 M6 |
 | M8 | Internal Recharge API | `pending` | 等待 M6 和密钥方案 |
 | M9 | 管理后台精简 | `pending` | 等待核心后端功能稳定 |
@@ -599,7 +599,65 @@ M6.1 完成并可形成独立提交。Migration 已在本地测试库执行，�
 * 公开注册由 M2 保持关闭；若未来恢复，非零默认余额必须通过开账事务，不能直接写 `users.balance`。
 * M6 保持 `in_progress`。按计划进入 M6.3：新增 `user_model_permissions` 并在请求前执行用户与模型授权。之后依次完成 API Key HMAC 摘要、上游凭据加密、对账告警和 Composite 精确目标 Group 路由。
 
-## 19. 后续记录模板
+## 19. 2026-09-13 / M6.3 开始：用户模型权限
+
+### 目标与边界
+
+本子任务只新增 `user_model_permissions`、管理员完整替换 API 和 Gateway 请求前授权检查，并让模型目录按当前用户权限过滤。API Key HMAC 摘要、Account credential 加密、价格门禁、usage 钱包结算、对账告警以及 Composite `target_group_id`/`composite_explicit_routes_only` 仍按后续 M6/M7 子任务实施；不把尚未完成的 M6 分支切换为稳定本地实例。
+
+### Schema 与 Gateway 敏感改动说明
+
+* 原因：现有 Group 绑定只能限定访问入口，不能表达“某个 User 是否允许使用某条逻辑模型 Route”；继续依赖模型前缀或账号池能力会让未授权模型进入调度链路。
+* 影响：新增 forward-only migration `242_user_model_permissions.sql`、Ent schema/生成代码、权限 repository/service、Admin handler/route、Gateway route middleware 和对应 API 客户端类型。权限检查位于 Composite 显式 Route 命中后、`requireGroup` 与 handler 获取上游并发槽之前；模型目录只保留显式授权的逻辑模型。
+* 回滚：应用可回退至 M6.2，新增表与历史权限行保留且不逆向删除；生产纠错通过新的权限替换或后续 forward migration。稳定 M2 容器不加载该未完成版本，所以本地既有调用不会被默认拒绝策略提前中断。
+* 默认策略：新用户没有权限行即拒绝；Route 停用后授权自动失效；数据库或权限查询异常一律 fail closed；只认 Composite 显式 Route，detector/account ownership 产生的隐式决策不能获得授权。
+* 路由语义：一旦 Route 被任何权限行引用，当前已有的 `public_model`、`match_type`、`target_platform`、`upstream_model` 与 `endpoint` 禁止原地修改；`target_group_id` 在后续 M6 路由子任务加入时同步扩展该 trigger。
+
+### 上游与迁移号复核
+
+* 2026-09-13 已重新 `git fetch upstream main`；`upstream/main` 为 `bdb42e22f81fcb633ff0a060961211dd2bcb515b`（2026-09-12，固定审计基线落后 399 个提交）。本任务继续在已验收的固定基线上开发，不静默同步。
+* 当前 `upstream/main` migration 最大编号为 238，本分支最大编号为 241，因此本子任务使用 242；已发布的 239、240、241 不修改。
+
+### 计划测试
+
+* Migration/真实 PostgreSQL：复合主键、外键、索引、默认拒绝、Route 停用失效、语义字段 trigger、允许启停/优先级/备注修改。
+* Repository/service：完整替换的版本冲突、去重/非法 Route、并发覆盖保护、禁用 Route、管理员 actor 和事务回滚。
+* Handler/route：管理员认证、step-up、BIGINT 字符串边界、GET/PUT envelope、审计与稳定错误映射。
+* Gateway：显式 Route 授权通过；无记录、禁用权限、隐式 Route 在上游并发前拒绝并返回 403 `MODEL_NOT_ALLOWED`，数据库错误 fail closed 并返回 503 `MODEL_PERMISSION_UNAVAILABLE`；Models 仅返回授权交集。
+* 回归：Ent/Wire generate、完整 Backend、Frontend lint/typecheck/全量 Vitest/build、真实 PostgreSQL integration、升级库备份/migration/黑盒健康、`git diff --check`。
+
+## 20. 2026-09-13 / M6.3 完成：用户模型权限
+
+### 实现结果
+
+* 新增 `user_model_permissions` 复合主键表、Ent edge schema、repository/service 和管理员 GET/PUT API。权限集合以强 ETag 作为不透明版本，PUT 在用户维度持有事务级 advisory lock 后做完整替换；历史行保留，空数组撤销全部权限。
+* 管理员 PUT 由 step-up 中间件保护；GET 和 PUT 均有明确审计 action，PUT 记录目标 User、Route 数量和新版本。所有浏览器可见 BIGINT ID 使用字符串，避免 JavaScript 精度损失。
+* Composite 模型请求在显式 exact Route 命中后、进入 handler 和取得上游并发槽前校验用户权限。无记录、Route/Group 停用、隐式 detector/account ownership 或数据库错误均 fail closed；稳定错误为 403 `MODEL_NOT_ALLOWED` 或 503 `MODEL_PERMISSION_UNAVAILABLE`。
+* OpenAI、Codex 和 Gemini 模型目录只返回当前用户被授权且有效的 Route；空集合不再回退到静态或账号模型。Images 请求省略 model 时按现有默认 `gpt-image-2` 执行相同权限检查。
+* Route 一旦被权限行引用，Group、public model、match type、Provider、upstream model、endpoint 和删除状态不可原地改变；priority、enabled 与 notes 保持可操作。未来 M6 的 `target_group_id` forward migration 必须扩展同一 trigger。
+
+### 测试与本地升级证据
+
+| 项目 | 结果 |
+| --- | --- |
+| 代码生成 | `go generate ./ent`、`go generate ./cmd/server` 通过 |
+| Backend | Linux 容器内 `go test ./... -count=1` 全部通过 |
+| Frontend | lint、typecheck、252 个测试文件 / 1842 个测试、production build 全部通过 |
+| PostgreSQL integration | PostgreSQL 18：默认拒绝、授权、停用失效、版本冲突、语义 trigger、并发完整替换恰好一成一败均通过 |
+| 升级前备份 | `C:\Users\Administrator\AppData\Local\Temp\sub2api-m6-backups\pre-m6-3-20260913-200948.dump`，581329 bytes，1222 条 TOC，SHA-256 `F2E54C28569B01A6784A8475FBF78C0B3B4A981F019016580E72231ED5243BDB` |
+| 本地 migration | `242_user_model_permissions.sql` checksum 长度 64；表 3 个索引、4 个 PK/FK 约束、1 个 Route trigger；初始权限行 0 |
+| 候选镜像 | `sub2api:m6-user-model-permissions`，digest `sha256:e0c582eaac77b72d37226b068e9330ac3e95ba8fa78db9b397a84e3ca8d8de8a`，44859222 bytes |
+| 黑盒 | 无宿主端口候选实例连接本地 PostgreSQL/Redis 并 healthy；候选与稳定实例 `/health` 均为 ok；未认证 Admin 请求为 401；临时实例验收后移除 |
+| 稳定实例 | `sub2api:m2-scope-closure` 全程 healthy，仍只发布 `127.0.0.1:8080`，未切换未完成的 M6 分支 |
+| Git | `git diff --check` 通过（仅 Windows CRLF 提示） |
+
+### 剩余边界与下一步
+
+* M6.3 只保护 Composite 显式 Route；目标账号池目前仍只能锁定 platform，必须在后续 M6 增加 `target_group_id` 和 `composite_explicit_routes_only` 后才能隔离同平台不同成本池。
+* 模型目录尚未与 M7 有效价格求交；M7 完成前该分支不是可收费上线版本。Gateway usage 钱包结算、对账告警、API Key 摘要和 Account credential 加密也仍未完成。
+* 后台权限选择 UI 留在 M9；M6.3 已提供完整 Admin API 客户端契约。M6 下一顺序项为 M6.4 API Key HMAC 摘要与 Secret 一次展示。
+
+## 21. 后续记录模板
 
 每次工作结束追加一节，不覆盖历史记录。
 

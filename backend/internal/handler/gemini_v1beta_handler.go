@@ -45,6 +45,14 @@ func (h *GatewayHandler) GeminiV1BetaListModels(c *gin.Context) {
 		googleError(c, http.StatusBadRequest, "API key group platform is not gemini")
 		return
 	}
+	if authorizedModels, scoped := service.AuthorizedModelIDsFromContext(c.Request.Context()); scoped {
+		models := make([]gemini.Model, 0, len(authorizedModels))
+		for _, modelID := range authorizedModels {
+			models = append(models, gemini.FallbackModel(modelID))
+		}
+		c.JSON(http.StatusOK, gemini.ModelsListResponse{Models: models})
+		return
+	}
 
 	// 强制 antigravity 模式：返回 antigravity 支持的模型列表
 	if forcePlatform == service.PlatformAntigravity {

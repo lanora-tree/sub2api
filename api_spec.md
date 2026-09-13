@@ -354,12 +354,20 @@ PUT /api/v1/admin/users/{id}/model-permissions
 
 PUT 使用完整替换并要求 `If-Match` 或 version，避免并发覆盖：
 
+```http
+If-Match: "51491e...c885"
+Content-Type: application/json
+```
+
 ```json
 {
-  "version": 3,
   "route_ids": ["11", "12", "21"]
 }
 ```
+
+GET 与成功的 PUT 都返回强 `ETag`，并在 envelope 的 `data.version` 中返回同一个不透明 SHA-256 版本。BIGINT `user_id`、`route_id`、`created_by` 与 `access_group_id` 一律编码为 JSON 字符串。PUT 也可在 body 中发送字符串 `version`；弱 ETag 不接受。缺少版本返回 HTTP 428 `MODEL_PERMISSION_VERSION_REQUIRED`，并发版本冲突返回 HTTP 409 `MODEL_PERMISSION_VERSION_MISMATCH`。
+
+`route_ids` 表示完整的启用集合，空数组表示撤销该用户全部模型权限。当前只接受属于 Composite Group 的、未删除的 exact Route；新用户无记录即默认拒绝。返回的 `permissions` 同时保留已停用的历史授权，`effective=false` 表示权限、Route 或所属 Composite Group 当前不可用。PUT 是敏感操作，受 Admin step-up 保护并写审计日志。
 
 ### 5.3 V1 Route
 

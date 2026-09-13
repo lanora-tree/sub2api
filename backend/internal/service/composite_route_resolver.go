@@ -10,6 +10,7 @@ import (
 type CompositeRouteResolver struct {
 	repo                   CompositeModelRouteRepository
 	modelOwnershipResolver CompositeModelOwnershipResolver
+	permissionService      *UserModelPermissionService
 }
 
 func NewCompositeRouteResolver(repo CompositeModelRouteRepository) *CompositeRouteResolver {
@@ -20,6 +21,26 @@ func (r *CompositeRouteResolver) SetModelOwnershipResolver(resolver CompositeMod
 	if r != nil {
 		r.modelOwnershipResolver = resolver
 	}
+}
+
+func (r *CompositeRouteResolver) SetPermissionService(permissionService *UserModelPermissionService) {
+	if r != nil {
+		r.permissionService = permissionService
+	}
+}
+
+func (r *CompositeRouteResolver) IsRouteAllowed(ctx context.Context, userID, routeID int64) (bool, error) {
+	if r == nil || r.permissionService == nil {
+		return false, ErrModelPermissionUnavailable
+	}
+	return r.permissionService.IsAllowed(ctx, userID, routeID)
+}
+
+func (r *CompositeRouteResolver) ListAuthorizedModels(ctx context.Context, userID, groupID int64, endpoint string) ([]string, error) {
+	if r == nil || r.permissionService == nil {
+		return nil, ErrModelPermissionUnavailable
+	}
+	return r.permissionService.ListAuthorizedModels(ctx, userID, groupID, endpoint)
 }
 
 func (r *CompositeRouteResolver) Resolve(ctx context.Context, groupID int64, model, endpoint string) (CompositeRouteDecision, error) {

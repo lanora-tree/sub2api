@@ -74,6 +74,29 @@ export interface WalletTransactionResponse {
   created_at: string
 }
 
+export interface UserModelPermission {
+  route_id: string
+  enabled: boolean
+  effective: boolean
+  created_by: string
+  created_at: string
+  updated_at: string
+  access_group_id: string
+  public_model: string
+  match_type: 'exact'
+  target_platform: string
+  upstream_model: string
+  endpoint: string
+  route_enabled: boolean
+}
+
+export interface UserModelPermissionSnapshot {
+  user_id: string
+  version: string
+  route_ids: string[]
+  permissions: UserModelPermission[]
+}
+
 /**
  * List all users with pagination
  * @param page - Page number (default: 1)
@@ -223,6 +246,26 @@ export async function refundUsage(
 
 export async function getWallet(id: number): Promise<WalletBalanceResponse> {
   const { data } = await apiClient.get<WalletBalanceResponse>(`/admin/users/${id}/wallet`)
+  return data
+}
+
+export async function getModelPermissions(id: number | string): Promise<UserModelPermissionSnapshot> {
+  const { data } = await apiClient.get<UserModelPermissionSnapshot>(
+    `/admin/users/${id}/model-permissions`
+  )
+  return data
+}
+
+export async function replaceModelPermissions(
+  id: number | string,
+  version: string,
+  routeIds: string[]
+): Promise<UserModelPermissionSnapshot> {
+  const { data } = await apiClient.put<UserModelPermissionSnapshot>(
+    `/admin/users/${id}/model-permissions`,
+    { route_ids: routeIds },
+    { headers: { 'If-Match': `"${version}"` } }
+  )
   return data
 }
 
@@ -449,6 +492,8 @@ export const usersAPI = {
   updateBalance,
   refundUsage,
   getWallet,
+  getModelPermissions,
+  replaceModelPermissions,
   updateConcurrency,
   batchUpdateLimits,
   toggleStatus,

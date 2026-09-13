@@ -1949,6 +1949,47 @@ var (
 			},
 		},
 	}
+	// UserModelPermissionsColumns holds the columns for the "user_model_permissions" table.
+	UserModelPermissionsColumns = []*schema.Column{
+		{Name: "enabled", Type: field.TypeBool, Default: true},
+		{Name: "created_by", Type: field.TypeInt64},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "user_id", Type: field.TypeInt64},
+		{Name: "route_id", Type: field.TypeInt64},
+	}
+	// UserModelPermissionsTable holds the schema information for the "user_model_permissions" table.
+	UserModelPermissionsTable = &schema.Table{
+		Name:       "user_model_permissions",
+		Columns:    UserModelPermissionsColumns,
+		PrimaryKey: []*schema.Column{UserModelPermissionsColumns[4], UserModelPermissionsColumns[5]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "user_model_permissions_users_user",
+				Columns:    []*schema.Column{UserModelPermissionsColumns[4]},
+				RefColumns: []*schema.Column{UsersColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+			{
+				Symbol:     "user_model_permissions_composite_model_routes_route",
+				Columns:    []*schema.Column{UserModelPermissionsColumns[5]},
+				RefColumns: []*schema.Column{CompositeModelRoutesColumns[0]},
+				OnDelete:   schema.Restrict,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "usermodelpermission_route_id_enabled",
+				Unique:  false,
+				Columns: []*schema.Column{UserModelPermissionsColumns[5], UserModelPermissionsColumns[0]},
+			},
+			{
+				Name:    "usermodelpermission_user_id_enabled",
+				Unique:  false,
+				Columns: []*schema.Column{UserModelPermissionsColumns[4], UserModelPermissionsColumns[0]},
+			},
+		},
+	}
 	// UserPlatformQuotasColumns holds the columns for the "user_platform_quotas" table.
 	UserPlatformQuotasColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt64, Increment: true},
@@ -2182,6 +2223,7 @@ var (
 		UserAllowedGroupsTable,
 		UserAttributeDefinitionsTable,
 		UserAttributeValuesTable,
+		UserModelPermissionsTable,
 		UserPlatformQuotasTable,
 		UserSubscriptionsTable,
 		WalletTransactionsTable,
@@ -2331,6 +2373,11 @@ func init() {
 	UserAttributeValuesTable.ForeignKeys[1].RefTable = UserAttributeDefinitionsTable
 	UserAttributeValuesTable.Annotation = &entsql.Annotation{
 		Table: "user_attribute_values",
+	}
+	UserModelPermissionsTable.ForeignKeys[0].RefTable = UsersTable
+	UserModelPermissionsTable.ForeignKeys[1].RefTable = CompositeModelRoutesTable
+	UserModelPermissionsTable.Annotation = &entsql.Annotation{
+		Table: "user_model_permissions",
 	}
 	UserPlatformQuotasTable.ForeignKeys[0].RefTable = UsersTable
 	UserPlatformQuotasTable.Annotation = &entsql.Annotation{

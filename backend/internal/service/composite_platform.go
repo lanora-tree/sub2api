@@ -45,7 +45,44 @@ func WithCompositeRouteDecision(ctx context.Context, decision CompositeRouteDeci
 	if source := strings.TrimSpace(decision.Source); source != "" {
 		ctx = context.WithValue(ctx, ctxkey.CompositeRouteSource, source)
 	}
+	if decision.Source == CompositeRouteSourceExplicit && decision.Route != nil && decision.Route.ID > 0 {
+		ctx = context.WithValue(ctx, ctxkey.CompositeRouteID, decision.Route.ID)
+	}
 	return ctx
+}
+
+func WithRequestedPublicModel(ctx context.Context, model string) context.Context {
+	model = strings.TrimSpace(model)
+	if ctx == nil || model == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, ctxkey.RequestedPublicModel, model)
+}
+
+func CompositeRouteIDFromContext(ctx context.Context) (int64, bool) {
+	if ctx == nil {
+		return 0, false
+	}
+	routeID, ok := ctx.Value(ctxkey.CompositeRouteID).(int64)
+	return routeID, ok && routeID > 0
+}
+
+func WithAuthorizedModelIDs(ctx context.Context, modelIDs []string) context.Context {
+	if ctx == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, ctxkey.AuthorizedModelIDs, append([]string(nil), modelIDs...))
+}
+
+func AuthorizedModelIDsFromContext(ctx context.Context) ([]string, bool) {
+	if ctx == nil {
+		return nil, false
+	}
+	modelIDs, ok := ctx.Value(ctxkey.AuthorizedModelIDs).([]string)
+	if !ok {
+		return nil, false
+	}
+	return append([]string(nil), modelIDs...), true
 }
 
 func ResolvedUpstreamModelFromContext(ctx context.Context) (string, bool) {

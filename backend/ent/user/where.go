@@ -1538,6 +1538,29 @@ func HasAllowedGroupsWith(preds ...predicate.Group) predicate.User {
 	})
 }
 
+// HasModelRoutes applies the HasEdge predicate on the "model_routes" edge.
+func HasModelRoutes() predicate.User {
+	return predicate.User(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, false, ModelRoutesTable, ModelRoutesPrimaryKey...),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasModelRoutesWith applies the HasEdge predicate on the "model_routes" edge with a given conditions (other predicates).
+func HasModelRoutesWith(preds ...predicate.CompositeModelRoute) predicate.User {
+	return predicate.User(func(s *sql.Selector) {
+		step := newModelRoutesStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // HasUsageLogs applies the HasEdge predicate on the "usage_logs" edge.
 func HasUsageLogs() predicate.User {
 	return predicate.User(func(s *sql.Selector) {
@@ -1760,6 +1783,29 @@ func HasUserAllowedGroups() predicate.User {
 func HasUserAllowedGroupsWith(preds ...predicate.UserAllowedGroup) predicate.User {
 	return predicate.User(func(s *sql.Selector) {
 		step := newUserAllowedGroupsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasModelPermissions applies the HasEdge predicate on the "model_permissions" edge.
+func HasModelPermissions() predicate.User {
+	return predicate.User(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, true, ModelPermissionsTable, ModelPermissionsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasModelPermissionsWith applies the HasEdge predicate on the "model_permissions" edge with a given conditions (other predicates).
+func HasModelPermissionsWith(preds ...predicate.UserModelPermission) predicate.User {
+	return predicate.User(func(s *sql.Selector) {
+		step := newModelPermissionsStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

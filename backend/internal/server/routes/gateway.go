@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"log/slog"
 	"mime"
 	"mime/multipart"
 	"net/http"
@@ -38,8 +39,9 @@ func RegisterGatewayRoutes(
 	clientRequestID := middleware.ClientRequestID()
 	opsErrorLogger := handler.OpsErrorLoggerMiddleware(opsService)
 	endpointNorm := handler.InboundEndpointMiddleware()
-	compositeTarget := compositeTargetPlatformMiddleware(compositeResolver)
-	compositeGeminiTarget := compositeGeminiTargetPlatformMiddleware(compositeResolver)
+	compositeTarget := compositeTargetPlatformMiddleware(compositeResolver, true)
+	compositeGeminiTarget := compositeGeminiTargetPlatformMiddleware(compositeResolver, true)
+	modelPermissionGate := userModelPermissionMiddleware(compositeResolver)
 
 	// 未分组 Key 拦截中间件（按协议格式区分错误响应）
 	requireGroupAnthropic := middleware.RequireGroupAssignment(settingService, middleware.AnthropicErrorWriter)
@@ -190,6 +192,7 @@ func RegisterGatewayRoutes(
 	gateway.Use(gin.HandlerFunc(apiKeyAuth))
 	gateway.GET("/sub2api/billing", h.Gateway.KeyBillingInfo)
 	gateway.Use(compositeTarget)
+	gateway.Use(modelPermissionGate)
 	gateway.Use(requireGroupAnthropic)
 	{
 		// /v1/messages: auto-route based on group platform
@@ -342,6 +345,7 @@ func RegisterGatewayRoutes(
 	gemini.Use(endpointNorm)
 	gemini.Use(middleware.APIKeyAuthWithSubscriptionGoogle(apiKeyService, subscriptionService, cfg))
 	gemini.Use(compositeGeminiTarget)
+	gemini.Use(modelPermissionGate)
 	gemini.Use(requireGroupGoogle)
 	{
 		gemini.GET("/models", h.Gateway.GeminiV1BetaListModels)
@@ -358,16 +362,16 @@ func RegisterGatewayRoutes(
 		}
 		h.Gateway.Responses(c)
 	}
-	r.POST("/responses", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), compositeTarget, requireGroupAnthropic, responsesHandler)
-	r.POST("/responses/*subpath", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), compositeTarget, requireGroupAnthropic, guardResponsesSubpath(responsesHandler))
-	r.POST("/alpha/search", textBodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), compositeTarget, requireGroupAnthropic, h.OpenAIGateway.AlphaSearch)
-	r.GET("/responses", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), compositeTarget, requireGroupAnthropic, func(c *gin.Context) {
+	r.POST("/responses", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), compositeTarget, modelPermissionGate, requireGroupAnthropic, responsesHandler)
+	r.POST("/responses/*subpath", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), compositeTarget, modelPermissionGate, requireGroupAnthropic, guardResponsesSubpath(responsesHandler))
+	r.POST("/alpha/search", textBodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), compositeTarget, modelPermissionGate, requireGroupAnthropic, h.OpenAIGateway.AlphaSearch)
+	r.GET("/responses", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), compositeTarget, modelPermissionGate, requireGroupAnthropic, func(c *gin.Context) {
 		h.OpenAIGateway.ResponsesWebSocket(c)
 	})
-	r.GET("/models", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), requireGroupAnthropic, modelsHandler)
-	r.POST("/messages/count_tokens", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), compositeTarget, requireGroupAnthropic, countTokensHandler)
+	r.GET("/models", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), compositeTarget, modelPermissionGate, requireGroupAnthropic, modelsHandler)
+	r.POST("/messages/count_tokens", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), compositeTarget, modelPermissionGate, requireGroupAnthropic, countTokensHandler)
 	codexDirect := r.Group("/backend-api/codex")
-	codexDirect.Use(bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), compositeTarget, requireGroupAnthropic)
+	codexDirect.Use(bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), compositeTarget, modelPermissionGate, requireGroupAnthropic)
 	{
 		codexDirect.POST("/realtime/calls", h.OpenAIGateway.Live)
 		codexDirect.GET("/:call_id", h.OpenAIGateway.LiveSideband)
@@ -526,7 +530,7 @@ func getGroupPlatform(c *gin.Context) string {
 	return apiKey.Group.Platform
 }
 
-func compositeTargetPlatformMiddleware(resolver *service.CompositeRouteResolver) gin.HandlerFunc {
+func compositeTargetPlatformMiddleware(resolver *service.CompositeRouteResolver, enforcePermission ...bool) gin.HandlerFunc {
 	if resolver == nil {
 		resolver = service.NewCompositeRouteResolver(nil)
 	}
@@ -556,8 +560,13 @@ func compositeTargetPlatformMiddleware(resolver *service.CompositeRouteResolver)
 		}
 
 		model := compositeRequestModelFromBody(c.GetHeader("Content-Type"), body)
+		if model == "" && compositeRequestUsesDefaultImageModel(c.Request.URL.Path) {
+			model = "gpt-image-2"
+		}
 		if model != "" {
-			decision, err := resolver.Resolve(c.Request.Context(), apiKey.Group.ID, model, compositeRouteEndpointForPath(c.Request.URL.Path))
+			requestContext := service.WithRequestedPublicModel(c.Request.Context(), model)
+			c.Request = c.Request.WithContext(requestContext)
+			decision, err := resolver.Resolve(requestContext, apiKey.Group.ID, model, compositeRouteEndpointForPath(c.Request.URL.Path))
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"type": "server_error", "message": "Failed to resolve composite model route"}})
 				c.Abort()
@@ -573,10 +582,101 @@ func compositeTargetPlatformMiddleware(resolver *service.CompositeRouteResolver)
 					}
 				}
 			}
+			if len(enforcePermission) > 0 && enforcePermission[0] && !authorizeCompositeRouteDecision(c, resolver, decision) {
+				return
+			}
 		}
 		resetRequestBody(c, body)
 		c.Next()
 	}
+}
+
+func compositeRequestUsesDefaultImageModel(path string) bool {
+	switch path {
+	case "/v1/images/generations", "/v1/images/edits":
+		return true
+	default:
+		return false
+	}
+}
+
+// userModelPermissionMiddleware handles model catalogs. Model-bearing requests
+// are authorized inside the Composite resolution middleware so the decision is
+// checked before any handler can acquire an upstream concurrency slot.
+func userModelPermissionMiddleware(resolver *service.CompositeRouteResolver) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		apiKey, ok := middleware.GetAPIKeyFromContext(c)
+		if !ok || apiKey == nil || apiKey.Group == nil || apiKey.Group.Platform != service.PlatformComposite {
+			c.Next()
+			return
+		}
+		endpoint, isList := permissionModelListEndpoint(c.Request.Method, c.Request.URL.Path)
+		if !isList {
+			c.Next()
+			return
+		}
+		subject, ok := middleware.GetAuthSubjectFromContext(c)
+		if !ok || subject.UserID <= 0 || resolver == nil {
+			abortModelPermission(c, http.StatusServiceUnavailable, "MODEL_PERMISSION_UNAVAILABLE", "Model permission check unavailable")
+			return
+		}
+		models, err := resolver.ListAuthorizedModels(c.Request.Context(), subject.UserID, apiKey.Group.ID, endpoint)
+		if err != nil {
+			slog.Error("list authorized gateway models failed", "user_id", subject.UserID, "group_id", apiKey.Group.ID, "error", err)
+			abortModelPermission(c, http.StatusServiceUnavailable, "MODEL_PERMISSION_UNAVAILABLE", "Model permission check unavailable")
+			return
+		}
+		c.Request = c.Request.WithContext(service.WithAuthorizedModelIDs(c.Request.Context(), models))
+		c.Next()
+	}
+}
+
+func authorizeCompositeRouteDecision(c *gin.Context, resolver *service.CompositeRouteResolver, decision service.CompositeRouteDecision) bool {
+	if decision.Source != service.CompositeRouteSourceExplicit || decision.Route == nil || decision.Route.ID <= 0 {
+		abortModelPermission(c, http.StatusForbidden, "MODEL_NOT_ALLOWED", "Current user is not allowed to use this model")
+		return false
+	}
+	subject, ok := middleware.GetAuthSubjectFromContext(c)
+	if !ok || subject.UserID <= 0 || resolver == nil {
+		abortModelPermission(c, http.StatusServiceUnavailable, "MODEL_PERMISSION_UNAVAILABLE", "Model permission check unavailable")
+		return false
+	}
+	allowed, err := resolver.IsRouteAllowed(c.Request.Context(), subject.UserID, decision.Route.ID)
+	if err != nil {
+		slog.Error("gateway model permission check failed", "user_id", subject.UserID, "route_id", decision.Route.ID, "error", err)
+		abortModelPermission(c, http.StatusServiceUnavailable, "MODEL_PERMISSION_UNAVAILABLE", "Model permission check unavailable")
+		return false
+	}
+	if !allowed {
+		abortModelPermission(c, http.StatusForbidden, "MODEL_NOT_ALLOWED", "Current user is not allowed to use this model")
+		return false
+	}
+	return true
+}
+
+func permissionModelListEndpoint(method, path string) (string, bool) {
+	if method != http.MethodGet {
+		return "", false
+	}
+	switch path {
+	case "/v1/models", "/models":
+		return service.CompositeRouteEndpointAny, true
+	case "/v1beta/models":
+		return service.CompositeRouteEndpointGemini, true
+	default:
+		return "", false
+	}
+}
+
+func abortModelPermission(c *gin.Context, status int, code, message string) {
+	c.AbortWithStatusJSON(status, gin.H{
+		"error": gin.H{
+			"message": message,
+			"type":    "invalid_request_error",
+			"code":    code,
+			"param":   "model",
+		},
+	})
 }
 
 func compositeRequestModelFromBody(contentType string, body []byte) string {
@@ -636,7 +736,7 @@ func compositeMultipartModelFromBody(contentType string, body []byte) string {
 	}
 }
 
-func compositeGeminiTargetPlatformMiddleware(resolver *service.CompositeRouteResolver) gin.HandlerFunc {
+func compositeGeminiTargetPlatformMiddleware(resolver *service.CompositeRouteResolver, enforcePermission ...bool) gin.HandlerFunc {
 	if resolver == nil {
 		resolver = service.NewCompositeRouteResolver(nil)
 	}
@@ -645,7 +745,9 @@ func compositeGeminiTargetPlatformMiddleware(resolver *service.CompositeRouteRes
 		if ok && apiKey != nil && apiKey.Group != nil && apiKey.Group.Platform == service.PlatformComposite {
 			model := compositeGeminiModelFromParams(c)
 			if model != "" {
-				decision, err := resolver.Resolve(c.Request.Context(), apiKey.Group.ID, model, service.CompositeRouteEndpointGemini)
+				requestContext := service.WithRequestedPublicModel(c.Request.Context(), model)
+				c.Request = c.Request.WithContext(requestContext)
+				decision, err := resolver.Resolve(requestContext, apiKey.Group.ID, model, service.CompositeRouteEndpointGemini)
 				if err != nil {
 					c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"type": "server_error", "message": "Failed to resolve composite model route"}})
 					c.Abort()
@@ -653,6 +755,9 @@ func compositeGeminiTargetPlatformMiddleware(resolver *service.CompositeRouteRes
 				}
 				if decision.Matched {
 					c.Request = c.Request.WithContext(service.WithCompositeRouteDecision(c.Request.Context(), decision))
+				}
+				if len(enforcePermission) > 0 && enforcePermission[0] && !authorizeCompositeRouteDecision(c, resolver, decision) {
+					return
 				}
 			}
 			if _, resolved := service.ResolvedTargetPlatformFromContext(c.Request.Context()); !resolved {

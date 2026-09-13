@@ -228,6 +228,58 @@ func TestGatewayCodexModels_CompositeUsesCompleteEffectiveModelList(t *testing.T
 	require.Equal(t, []string{"gpt-5.5", "grok-4.6"}, codexModelSlugsForTest(got.Models))
 }
 
+func TestGatewayModelCatalogsDoNotFallbackOutsidePermissionScope(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	const groupID int64 = 123
+	h := newGatewayModelsHandlerForTest(&gatewayModelsAccountRepoStub{
+		byGroup: map[int64][]service.Account{
+			groupID: {{
+				ID: 1, Platform: service.PlatformOpenAI,
+				Credentials: map[string]any{"model_mapping": map[string]any{"unpermitted": "gpt-5"}},
+			}},
+		},
+	})
+	group := &service.Group{ID: groupID, Platform: service.PlatformComposite}
+
+	for _, tt := range []struct {
+		name    string
+		codex   bool
+		models  []string
+		wantIDs []string
+	}{
+		{name: "standard empty", models: []string{}, wantIDs: []string{}},
+		{name: "standard intersection", models: []string{"permitted"}, wantIDs: []string{"permitted"}},
+		{name: "codex empty", codex: true, models: []string{}, wantIDs: []string{}},
+		{name: "codex intersection", codex: true, models: []string{"permitted"}, wantIDs: []string{"permitted"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(rec)
+			request := httptest.NewRequest(http.MethodGet, "/models", nil)
+			request = request.WithContext(service.WithAuthorizedModelIDs(request.Context(), tt.models))
+			c.Request = request
+			c.Set(string(middleware2.ContextKeyAPIKey), &service.APIKey{Group: group})
+
+			if tt.codex {
+				h.CodexModels(c)
+				var got codexModelsResponseForTest
+				require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
+				require.Equal(t, tt.wantIDs, codexModelSlugsForTest(got.Models))
+			} else {
+				h.Models(c)
+				var got gatewayModelsResponseForTest
+				require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
+				ids := make([]string, 0, len(got.Data))
+				for _, model := range got.Data {
+					ids = append(ids, model.ID)
+				}
+				require.Equal(t, tt.wantIDs, ids)
+			}
+			require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		})
+	}
+}
+
 func TestGatewayCodexModels_GeneratedManifestUsesFinalBodyETag(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	const groupID int64 = 122

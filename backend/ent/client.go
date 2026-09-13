@@ -52,6 +52,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/userallowedgroup"
 	"github.com/Wei-Shaw/sub2api/ent/userattributedefinition"
 	"github.com/Wei-Shaw/sub2api/ent/userattributevalue"
+	"github.com/Wei-Shaw/sub2api/ent/usermodelpermission"
 	"github.com/Wei-Shaw/sub2api/ent/userplatformquota"
 	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
 	"github.com/Wei-Shaw/sub2api/ent/wallettransaction"
@@ -138,6 +139,8 @@ type Client struct {
 	UserAttributeDefinition *UserAttributeDefinitionClient
 	// UserAttributeValue is the client for interacting with the UserAttributeValue builders.
 	UserAttributeValue *UserAttributeValueClient
+	// UserModelPermission is the client for interacting with the UserModelPermission builders.
+	UserModelPermission *UserModelPermissionClient
 	// UserPlatformQuota is the client for interacting with the UserPlatformQuota builders.
 	UserPlatformQuota *UserPlatformQuotaClient
 	// UserSubscription is the client for interacting with the UserSubscription builders.
@@ -192,6 +195,7 @@ func (c *Client) init() {
 	c.UserAllowedGroup = NewUserAllowedGroupClient(c.config)
 	c.UserAttributeDefinition = NewUserAttributeDefinitionClient(c.config)
 	c.UserAttributeValue = NewUserAttributeValueClient(c.config)
+	c.UserModelPermission = NewUserModelPermissionClient(c.config)
 	c.UserPlatformQuota = NewUserPlatformQuotaClient(c.config)
 	c.UserSubscription = NewUserSubscriptionClient(c.config)
 	c.WalletTransaction = NewWalletTransactionClient(c.config)
@@ -324,6 +328,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		UserAllowedGroup:              NewUserAllowedGroupClient(cfg),
 		UserAttributeDefinition:       NewUserAttributeDefinitionClient(cfg),
 		UserAttributeValue:            NewUserAttributeValueClient(cfg),
+		UserModelPermission:           NewUserModelPermissionClient(cfg),
 		UserPlatformQuota:             NewUserPlatformQuotaClient(cfg),
 		UserSubscription:              NewUserSubscriptionClient(cfg),
 		WalletTransaction:             NewWalletTransactionClient(cfg),
@@ -383,6 +388,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		UserAllowedGroup:              NewUserAllowedGroupClient(cfg),
 		UserAttributeDefinition:       NewUserAttributeDefinitionClient(cfg),
 		UserAttributeValue:            NewUserAttributeValueClient(cfg),
+		UserModelPermission:           NewUserModelPermissionClient(cfg),
 		UserPlatformQuota:             NewUserPlatformQuotaClient(cfg),
 		UserSubscription:              NewUserSubscriptionClient(cfg),
 		WalletTransaction:             NewWalletTransactionClient(cfg),
@@ -425,7 +431,8 @@ func (c *Client) Use(hooks ...Hook) {
 		c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting, c.SubscriptionPlan,
 		c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
 		c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
-		c.UserPlatformQuota, c.UserSubscription, c.WalletTransaction,
+		c.UserModelPermission, c.UserPlatformQuota, c.UserSubscription,
+		c.WalletTransaction,
 	} {
 		n.Use(hooks...)
 	}
@@ -445,7 +452,8 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.Proxy, c.RedeemCode, c.SecuritySecret, c.Setting, c.SubscriptionPlan,
 		c.TLSFingerprintProfile, c.UsageCleanupTask, c.UsageLog, c.User,
 		c.UserAllowedGroup, c.UserAttributeDefinition, c.UserAttributeValue,
-		c.UserPlatformQuota, c.UserSubscription, c.WalletTransaction,
+		c.UserModelPermission, c.UserPlatformQuota, c.UserSubscription,
+		c.WalletTransaction,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -528,6 +536,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.UserAttributeDefinition.mutate(ctx, m)
 	case *UserAttributeValueMutation:
 		return c.UserAttributeValue.mutate(ctx, m)
+	case *UserModelPermissionMutation:
+		return c.UserModelPermission.mutate(ctx, m)
 	case *UserPlatformQuotaMutation:
 		return c.UserPlatformQuota.mutate(ctx, m)
 	case *UserSubscriptionMutation:
@@ -2857,6 +2867,38 @@ func (c *CompositeModelRouteClient) QueryGroup(_m *CompositeModelRoute) *GroupQu
 			sqlgraph.From(compositemodelroute.Table, compositemodelroute.FieldID, id),
 			sqlgraph.To(group.Table, group.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, false, compositemodelroute.GroupTable, compositemodelroute.GroupColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryPermittedUsers queries the permitted_users edge of a CompositeModelRoute.
+func (c *CompositeModelRouteClient) QueryPermittedUsers(_m *CompositeModelRoute) *UserQuery {
+	query := (&UserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(compositemodelroute.Table, compositemodelroute.FieldID, id),
+			sqlgraph.To(user.Table, user.FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, true, compositemodelroute.PermittedUsersTable, compositemodelroute.PermittedUsersPrimaryKey...),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryModelPermissions queries the model_permissions edge of a CompositeModelRoute.
+func (c *CompositeModelRouteClient) QueryModelPermissions(_m *CompositeModelRoute) *UserModelPermissionQuery {
+	query := (&UserModelPermissionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(compositemodelroute.Table, compositemodelroute.FieldID, id),
+			sqlgraph.To(usermodelpermission.Table, usermodelpermission.RouteColumn),
+			sqlgraph.Edge(sqlgraph.O2M, true, compositemodelroute.ModelPermissionsTable, compositemodelroute.ModelPermissionsColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -5893,6 +5935,22 @@ func (c *UserClient) QueryAllowedGroups(_m *User) *GroupQuery {
 	return query
 }
 
+// QueryModelRoutes queries the model_routes edge of a User.
+func (c *UserClient) QueryModelRoutes(_m *User) *CompositeModelRouteQuery {
+	query := (&CompositeModelRouteClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, id),
+			sqlgraph.To(compositemodelroute.Table, compositemodelroute.FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, false, user.ModelRoutesTable, user.ModelRoutesPrimaryKey...),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryUsageLogs queries the usage_logs edge of a User.
 func (c *UserClient) QueryUsageLogs(_m *User) *UsageLogQuery {
 	query := (&UsageLogClient{config: c.config}).Query()
@@ -6046,6 +6104,22 @@ func (c *UserClient) QueryUserAllowedGroups(_m *User) *UserAllowedGroupQuery {
 			sqlgraph.From(user.Table, user.FieldID, id),
 			sqlgraph.To(userallowedgroup.Table, userallowedgroup.UserColumn),
 			sqlgraph.Edge(sqlgraph.O2M, true, user.UserAllowedGroupsTable, user.UserAllowedGroupsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryModelPermissions queries the model_permissions edge of a User.
+func (c *UserClient) QueryModelPermissions(_m *User) *UserModelPermissionQuery {
+	query := (&UserModelPermissionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, id),
+			sqlgraph.To(usermodelpermission.Table, usermodelpermission.UserColumn),
+			sqlgraph.Edge(sqlgraph.O2M, true, user.ModelPermissionsTable, user.ModelPermissionsColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -6509,6 +6583,122 @@ func (c *UserAttributeValueClient) mutate(ctx context.Context, m *UserAttributeV
 		return (&UserAttributeValueDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown UserAttributeValue mutation op: %q", m.Op())
+	}
+}
+
+// UserModelPermissionClient is a client for the UserModelPermission schema.
+type UserModelPermissionClient struct {
+	config
+}
+
+// NewUserModelPermissionClient returns a client for the UserModelPermission from the given config.
+func NewUserModelPermissionClient(c config) *UserModelPermissionClient {
+	return &UserModelPermissionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `usermodelpermission.Hooks(f(g(h())))`.
+func (c *UserModelPermissionClient) Use(hooks ...Hook) {
+	c.hooks.UserModelPermission = append(c.hooks.UserModelPermission, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `usermodelpermission.Intercept(f(g(h())))`.
+func (c *UserModelPermissionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.UserModelPermission = append(c.inters.UserModelPermission, interceptors...)
+}
+
+// Create returns a builder for creating a UserModelPermission entity.
+func (c *UserModelPermissionClient) Create() *UserModelPermissionCreate {
+	mutation := newUserModelPermissionMutation(c.config, OpCreate)
+	return &UserModelPermissionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of UserModelPermission entities.
+func (c *UserModelPermissionClient) CreateBulk(builders ...*UserModelPermissionCreate) *UserModelPermissionCreateBulk {
+	return &UserModelPermissionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *UserModelPermissionClient) MapCreateBulk(slice any, setFunc func(*UserModelPermissionCreate, int)) *UserModelPermissionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &UserModelPermissionCreateBulk{err: fmt.Errorf("calling to UserModelPermissionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*UserModelPermissionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &UserModelPermissionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for UserModelPermission.
+func (c *UserModelPermissionClient) Update() *UserModelPermissionUpdate {
+	mutation := newUserModelPermissionMutation(c.config, OpUpdate)
+	return &UserModelPermissionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *UserModelPermissionClient) UpdateOne(_m *UserModelPermission) *UserModelPermissionUpdateOne {
+	mutation := newUserModelPermissionMutation(c.config, OpUpdateOne)
+	mutation.user = &_m.UserID
+	mutation.route = &_m.RouteID
+	return &UserModelPermissionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for UserModelPermission.
+func (c *UserModelPermissionClient) Delete() *UserModelPermissionDelete {
+	mutation := newUserModelPermissionMutation(c.config, OpDelete)
+	return &UserModelPermissionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Query returns a query builder for UserModelPermission.
+func (c *UserModelPermissionClient) Query() *UserModelPermissionQuery {
+	return &UserModelPermissionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeUserModelPermission},
+		inters: c.Interceptors(),
+	}
+}
+
+// QueryUser queries the user edge of a UserModelPermission.
+func (c *UserModelPermissionClient) QueryUser(_m *UserModelPermission) *UserQuery {
+	return c.Query().
+		Where(usermodelpermission.UserID(_m.UserID), usermodelpermission.RouteID(_m.RouteID)).
+		QueryUser()
+}
+
+// QueryRoute queries the route edge of a UserModelPermission.
+func (c *UserModelPermissionClient) QueryRoute(_m *UserModelPermission) *CompositeModelRouteQuery {
+	return c.Query().
+		Where(usermodelpermission.UserID(_m.UserID), usermodelpermission.RouteID(_m.RouteID)).
+		QueryRoute()
+}
+
+// Hooks returns the client hooks.
+func (c *UserModelPermissionClient) Hooks() []Hook {
+	return c.hooks.UserModelPermission
+}
+
+// Interceptors returns the client interceptors.
+func (c *UserModelPermissionClient) Interceptors() []Interceptor {
+	return c.inters.UserModelPermission
+}
+
+func (c *UserModelPermissionClient) mutate(ctx context.Context, m *UserModelPermissionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&UserModelPermissionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&UserModelPermissionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&UserModelPermissionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&UserModelPermissionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown UserModelPermission mutation op: %q", m.Op())
 	}
 }
 
@@ -7070,8 +7260,8 @@ type (
 		PaymentOrder, PaymentProviderInstance, PendingAuthSession, PromoCode,
 		PromoCodeUsage, Proxy, RedeemCode, SecuritySecret, Setting, SubscriptionPlan,
 		TLSFingerprintProfile, UsageCleanupTask, UsageLog, User, UserAllowedGroup,
-		UserAttributeDefinition, UserAttributeValue, UserPlatformQuota,
-		UserSubscription, WalletTransaction []ent.Hook
+		UserAttributeDefinition, UserAttributeValue, UserModelPermission,
+		UserPlatformQuota, UserSubscription, WalletTransaction []ent.Hook
 	}
 	inters struct {
 		APIKey, Account, AccountGroup, Announcement, AnnouncementRead, AuthIdentity,
@@ -7082,8 +7272,8 @@ type (
 		PaymentOrder, PaymentProviderInstance, PendingAuthSession, PromoCode,
 		PromoCodeUsage, Proxy, RedeemCode, SecuritySecret, Setting, SubscriptionPlan,
 		TLSFingerprintProfile, UsageCleanupTask, UsageLog, User, UserAllowedGroup,
-		UserAttributeDefinition, UserAttributeValue, UserPlatformQuota,
-		UserSubscription, WalletTransaction []ent.Interceptor
+		UserAttributeDefinition, UserAttributeValue, UserModelPermission,
+		UserPlatformQuota, UserSubscription, WalletTransaction []ent.Interceptor
 	}
 )
 

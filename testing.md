@@ -72,6 +72,9 @@ git diff --check
 3. User A 无法读取或修改 User B 权限。
 4. disabled User、Key、route、Group 的优先级正确。
 5. `/v1/models` 返回权限、启用 route、启用 target Group 和有效价格的交集，不因账号短暂 Cooldown 抖动；真实请求在无可调度账号时返回 503。
+6. 两个管理员基于同一 ETag 并发完整替换时只能一个成功，另一个返回 409，不发生 lost update。
+7. detector/account ownership 隐式路由、权限数据库错误和无权限行都在上游并发槽之前 fail closed。
+8. OpenAI Images 省略 model 时按服务端默认 `gpt-image-2` 执行同一 Route 权限检查，不能利用默认值绕过授权。
 
 ### 5.3 API Key
 

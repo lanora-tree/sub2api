@@ -72,6 +72,9 @@ func (CompositeModelRoute) Edges() []ent.Edge {
 			Unique().
 			Required().
 			Field("group_id"),
+		edge.From("permitted_users", User.Type).
+			Ref("model_routes").
+			Through("model_permissions", UserModelPermission.Type),
 	}
 }
 

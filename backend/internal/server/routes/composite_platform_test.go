@@ -3,6 +3,7 @@ package routes
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -18,6 +19,32 @@ import (
 
 type compositeRouteRepoStub struct {
 	routes []service.CompositeModelRoute
+}
+
+type gatewayModelPermissionRepoStub struct {
+	allowed      bool
+	models       []string
+	err          error
+	allowedCalls int
+	listCalls    int
+}
+
+func (s *gatewayModelPermissionRepoStub) GetSnapshot(context.Context, int64) (*service.UserModelPermissionSnapshot, error) {
+	return nil, s.err
+}
+
+func (s *gatewayModelPermissionRepoStub) Replace(context.Context, service.ReplaceUserModelPermissionsInput) (*service.UserModelPermissionSnapshot, error) {
+	return nil, s.err
+}
+
+func (s *gatewayModelPermissionRepoStub) IsAllowed(context.Context, int64, int64) (bool, error) {
+	s.allowedCalls++
+	return s.allowed, s.err
+}
+
+func (s *gatewayModelPermissionRepoStub) ListAuthorizedModels(context.Context, int64, int64, string) ([]string, error) {
+	s.listCalls++
+	return s.models, s.err
 }
 
 func (s compositeRouteRepoStub) ListByGroup(ctx context.Context, groupID int64, includeDisabled bool) ([]service.CompositeModelRoute, error) {
@@ -131,6 +158,140 @@ func TestCompositeTargetPlatformMiddlewareUsesExplicitRouteAndRewritesBody(t *te
 	router.ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusNoContent, w.Code)
+}
+
+func TestCompositeTargetPlatformMiddlewareEnforcesExplicitRoutePermission(t *testing.T) {
+	tests := []struct {
+		name          string
+		allowed       bool
+		permissionErr error
+		wantStatus    int
+		wantCode      string
+		wantHandler   bool
+	}{
+		{name: "allowed", allowed: true, wantStatus: http.StatusNoContent, wantHandler: true},
+		{name: "denied", wantStatus: http.StatusForbidden, wantCode: "MODEL_NOT_ALLOWED"},
+		{name: "unavailable", permissionErr: errors.New("database unavailable"), wantStatus: http.StatusServiceUnavailable, wantCode: "MODEL_PERMISSION_UNAVAILABLE"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
+			permissionRepo := &gatewayModelPermissionRepoStub{allowed: tt.allowed, err: tt.permissionErr}
+			resolver := service.NewCompositeRouteResolver(compositeRouteRepoStub{routes: []service.CompositeModelRoute{{
+				ID: 41, GroupID: 1, PublicModel: "public-gpt", MatchType: service.CompositeRouteMatchExact,
+				TargetPlatform: service.PlatformOpenAI, UpstreamModel: "gpt-5", Endpoint: service.CompositeRouteEndpointAny, Enabled: true,
+			}}})
+			resolver.SetPermissionService(service.NewUserModelPermissionService(permissionRepo))
+			handlerCalled := false
+			router := gin.New()
+			router.Use(func(c *gin.Context) {
+				groupID := int64(1)
+				c.Set(string(servermiddleware.ContextKeyAPIKey), &service.APIKey{GroupID: &groupID, Group: &service.Group{ID: groupID, Platform: service.PlatformComposite}})
+				c.Set(string(servermiddleware.ContextKeyUser), servermiddleware.AuthSubject{UserID: 7})
+				c.Next()
+			})
+			router.Use(compositeTargetPlatformMiddleware(resolver, true))
+			router.POST("/v1/chat/completions", func(c *gin.Context) {
+				handlerCalled = true
+				body, err := io.ReadAll(c.Request.Body)
+				require.NoError(t, err)
+				require.JSONEq(t, `{"model":"gpt-5"}`, string(body))
+				c.Status(http.StatusNoContent)
+			})
+
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"public-gpt"}`))
+			req.Header.Set("Content-Type", "application/json")
+			router.ServeHTTP(rec, req)
+
+			require.Equal(t, tt.wantStatus, rec.Code, rec.Body.String())
+			require.Equal(t, tt.wantHandler, handlerCalled)
+			require.Equal(t, 1, permissionRepo.allowedCalls)
+			if tt.wantCode != "" {
+				require.Contains(t, rec.Body.String(), `"code":"`+tt.wantCode+`"`)
+			}
+		})
+	}
+}
+
+func TestCompositeTargetPlatformMiddlewareRejectsImplicitDetectorRoute(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	permissionRepo := &gatewayModelPermissionRepoStub{allowed: true}
+	resolver := service.NewCompositeRouteResolver(nil)
+	resolver.SetPermissionService(service.NewUserModelPermissionService(permissionRepo))
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		groupID := int64(1)
+		c.Set(string(servermiddleware.ContextKeyAPIKey), &service.APIKey{GroupID: &groupID, Group: &service.Group{ID: groupID, Platform: service.PlatformComposite}})
+		c.Set(string(servermiddleware.ContextKeyUser), servermiddleware.AuthSubject{UserID: 7})
+		c.Next()
+	})
+	router.Use(compositeTargetPlatformMiddleware(resolver, true))
+	router.POST("/v1/chat/completions", func(c *gin.Context) { c.Status(http.StatusNoContent) })
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"gpt-5"}`))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
+	require.Contains(t, rec.Body.String(), `"code":"MODEL_NOT_ALLOWED"`)
+	require.Zero(t, permissionRepo.allowedCalls, "implicit routes must never enter the permission lookup")
+}
+
+func TestCompositeTargetPlatformMiddlewareAuthorizesDefaultImageModel(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	permissionRepo := &gatewayModelPermissionRepoStub{allowed: false}
+	resolver := service.NewCompositeRouteResolver(compositeRouteRepoStub{routes: []service.CompositeModelRoute{{
+		ID: 42, GroupID: 1, PublicModel: "gpt-image-2", MatchType: service.CompositeRouteMatchExact,
+		TargetPlatform: service.PlatformOpenAI, UpstreamModel: "gpt-image-2", Endpoint: service.CompositeRouteEndpointImages, Enabled: true,
+	}}})
+	resolver.SetPermissionService(service.NewUserModelPermissionService(permissionRepo))
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		groupID := int64(1)
+		c.Set(string(servermiddleware.ContextKeyAPIKey), &service.APIKey{GroupID: &groupID, Group: &service.Group{ID: groupID, Platform: service.PlatformComposite}})
+		c.Set(string(servermiddleware.ContextKeyUser), servermiddleware.AuthSubject{UserID: 7})
+		c.Next()
+	})
+	router.Use(compositeTargetPlatformMiddleware(resolver, true))
+	router.POST("/v1/images/generations", func(c *gin.Context) { c.Status(http.StatusNoContent) })
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/images/generations", strings.NewReader(`{"prompt":"draw"}`))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
+	require.Contains(t, rec.Body.String(), `"code":"MODEL_NOT_ALLOWED"`)
+	require.Equal(t, 1, permissionRepo.allowedCalls)
+}
+
+func TestUserModelPermissionMiddlewareScopesCompositeCatalog(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	permissionRepo := &gatewayModelPermissionRepoStub{models: []string{"allowed-a", "allowed-b"}}
+	resolver := service.NewCompositeRouteResolver(nil)
+	resolver.SetPermissionService(service.NewUserModelPermissionService(permissionRepo))
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		groupID := int64(1)
+		c.Set(string(servermiddleware.ContextKeyAPIKey), &service.APIKey{GroupID: &groupID, Group: &service.Group{ID: groupID, Platform: service.PlatformComposite}})
+		c.Set(string(servermiddleware.ContextKeyUser), servermiddleware.AuthSubject{UserID: 7})
+		c.Next()
+	})
+	router.Use(userModelPermissionMiddleware(resolver))
+	router.GET("/v1/models", func(c *gin.Context) {
+		models, scoped := service.AuthorizedModelIDsFromContext(c.Request.Context())
+		require.True(t, scoped)
+		require.Equal(t, []string{"allowed-a", "allowed-b"}, models)
+		c.Status(http.StatusNoContent)
+	})
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v1/models", nil))
+
+	require.Equal(t, http.StatusNoContent, rec.Code, rec.Body.String())
+	require.Equal(t, 1, permissionRepo.listCalls)
 }
 
 func TestCompositeTargetPlatformMiddlewareRewritesNestedLiveModel(t *testing.T) {
@@ -312,3 +473,5 @@ func TestCompositeGeminiTargetPlatformMiddlewareUsesPathRoute(t *testing.T) {
 
 	require.Equal(t, http.StatusNoContent, w.Code)
 }
+
+var _ service.UserModelPermissionRepository = (*gatewayModelPermissionRepoStub)(nil)

@@ -67,6 +67,18 @@
 
 应用可回退至 M6.1；新增列为空时旧读取路径兼容。Migration 与已经写入的退款流水保持 forward-only，不得删除、改写或解除唯一性。测试库完全恢复使用升级前备份；生产纠错只能新增补偿调账。公开注册继续保持关闭，未来恢复前必须为非零默认余额补充开账事务。
 
+### M6.3 completed
+
+* 新增 forward-only migration `242_user_model_permissions.sql`、Ent edge schema 和 PostgreSQL 权限 repository；无记录默认拒绝，Route/Group 停用立即失效，历史授权行保留。
+* 管理员 GET/PUT 模型权限 API 使用强 ETag、原子完整替换、step-up 与审计；浏览器可见的 BIGINT ID 使用字符串，事务级 advisory lock 和版本比较拒绝并发覆盖。
+* Composite Gateway 在上游并发前只允许已授权的显式 exact Route，隐式 detector/account ownership、无权限和查询异常全部 fail closed；OpenAI、Codex 与 Gemini 模型目录不再泄漏未授权或静态回退模型。
+* 被权限引用的 Route 禁止原地修改 Group、public model、match type、Provider、upstream model、endpoint 或删除状态；启停、priority 与备注仍可操作。
+* Ent/Wire 生成、后端定向测试和 PostgreSQL 18 原子并发 integration 已通过；完整前后端回归与本地升级库/临时镜像证据见 `progress.md`。
+
+### M6.3 recovery
+
+应用可回退至 M6.2；migration、权限历史行和 Route 语义保护保持 forward-only，不删除或改写。回退应用不会读取新表；重新启用 M6.3 前应复核每个用户的授权集合。后续 `target_group_id` migration 必须扩展语义保护 trigger。
+
 ### M0 completed
 
 * 在 `codex/m0-baseline` 固定上游提交 `b1748c4ea99ce2120401a269142aa071e18a84da`。

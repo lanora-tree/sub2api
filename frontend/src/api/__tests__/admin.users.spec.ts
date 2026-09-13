@@ -1,12 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { post } = vi.hoisted(() => ({
+const { get, post, put } = vi.hoisted(() => ({
+  get: vi.fn(),
   post: vi.fn(),
+  put: vi.fn(),
 }))
 
 vi.mock('@/api/client', () => ({
   apiClient: {
+    get,
     post,
+    put,
   },
 }))
 
@@ -14,6 +18,8 @@ import {
   batchUpdateLimits,
   bindUserAuthIdentity,
   refundUsage,
+  getModelPermissions,
+  replaceModelPermissions,
   updateBalance,
   type AdminBindAuthIdentityRequest,
   type AdminBoundAuthIdentity,
@@ -85,7 +91,9 @@ const batchResponseContractExact: Assert<
 
 describe('admin users api auth identity binding', () => {
   beforeEach(() => {
+    get.mockReset()
     post.mockReset()
+    put.mockReset()
   })
 
   it('posts the backend-compatible auth identity bind payload and returns the backend response shape', async () => {
@@ -183,6 +191,31 @@ describe('admin users api auth identity binding', () => {
       '/admin/users/7/wallet/refunds',
       { original_transaction_id: 44, note: 'approved ticket' },
       { headers: { 'Idempotency-Key': 'refund-key-44' } }
+    )
+  })
+
+  it('loads and replaces model permissions with the strong version precondition', async () => {
+    const snapshot = {
+      user_id: '7',
+      version: 'abc123',
+      route_ids: ['11'],
+      permissions: [],
+    }
+    get.mockResolvedValue({ data: snapshot })
+    put.mockResolvedValue({ data: { ...snapshot, version: 'def456', route_ids: ['11', '12'] } })
+
+    await expect(getModelPermissions(7)).resolves.toEqual(snapshot)
+    await expect(replaceModelPermissions(7, 'abc123', ['11', '12'])).resolves.toEqual({
+      ...snapshot,
+      version: 'def456',
+      route_ids: ['11', '12'],
+    })
+
+    expect(get).toHaveBeenCalledWith('/admin/users/7/model-permissions')
+    expect(put).toHaveBeenCalledWith(
+      '/admin/users/7/model-permissions',
+      { route_ids: ['11', '12'] },
+      { headers: { 'If-Match': '"abc123"' } }
     )
   })
 })

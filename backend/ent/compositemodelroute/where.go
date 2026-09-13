@@ -738,6 +738,52 @@ func HasGroupWith(preds ...predicate.Group) predicate.CompositeModelRoute {
 	})
 }
 
+// HasPermittedUsers applies the HasEdge predicate on the "permitted_users" edge.
+func HasPermittedUsers() predicate.CompositeModelRoute {
+	return predicate.CompositeModelRoute(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, true, PermittedUsersTable, PermittedUsersPrimaryKey...),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasPermittedUsersWith applies the HasEdge predicate on the "permitted_users" edge with a given conditions (other predicates).
+func HasPermittedUsersWith(preds ...predicate.User) predicate.CompositeModelRoute {
+	return predicate.CompositeModelRoute(func(s *sql.Selector) {
+		step := newPermittedUsersStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasModelPermissions applies the HasEdge predicate on the "model_permissions" edge.
+func HasModelPermissions() predicate.CompositeModelRoute {
+	return predicate.CompositeModelRoute(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, true, ModelPermissionsTable, ModelPermissionsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasModelPermissionsWith applies the HasEdge predicate on the "model_permissions" edge with a given conditions (other predicates).
+func HasModelPermissionsWith(preds ...predicate.UserModelPermission) predicate.CompositeModelRoute {
+	return predicate.CompositeModelRoute(func(s *sql.Selector) {
+		step := newModelPermissionsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // And groups predicates with the AND operator between them.
 func And(predicates ...predicate.CompositeModelRoute) predicate.CompositeModelRoute {
 	return predicate.CompositeModelRoute(sql.AndPredicates(predicates...))

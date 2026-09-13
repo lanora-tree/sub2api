@@ -14,6 +14,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/compositemodelroute"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
+	"github.com/Wei-Shaw/sub2api/ent/user"
 )
 
 // CompositeModelRouteUpdate is the builder for updating CompositeModelRoute entities.
@@ -199,6 +200,21 @@ func (_u *CompositeModelRouteUpdate) SetGroup(v *Group) *CompositeModelRouteUpda
 	return _u.SetGroupID(v.ID)
 }
 
+// AddPermittedUserIDs adds the "permitted_users" edge to the User entity by IDs.
+func (_u *CompositeModelRouteUpdate) AddPermittedUserIDs(ids ...int64) *CompositeModelRouteUpdate {
+	_u.mutation.AddPermittedUserIDs(ids...)
+	return _u
+}
+
+// AddPermittedUsers adds the "permitted_users" edges to the User entity.
+func (_u *CompositeModelRouteUpdate) AddPermittedUsers(v ...*User) *CompositeModelRouteUpdate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddPermittedUserIDs(ids...)
+}
+
 // Mutation returns the CompositeModelRouteMutation object of the builder.
 func (_u *CompositeModelRouteUpdate) Mutation() *CompositeModelRouteMutation {
 	return _u.mutation
@@ -208,6 +224,27 @@ func (_u *CompositeModelRouteUpdate) Mutation() *CompositeModelRouteMutation {
 func (_u *CompositeModelRouteUpdate) ClearGroup() *CompositeModelRouteUpdate {
 	_u.mutation.ClearGroup()
 	return _u
+}
+
+// ClearPermittedUsers clears all "permitted_users" edges to the User entity.
+func (_u *CompositeModelRouteUpdate) ClearPermittedUsers() *CompositeModelRouteUpdate {
+	_u.mutation.ClearPermittedUsers()
+	return _u
+}
+
+// RemovePermittedUserIDs removes the "permitted_users" edge to User entities by IDs.
+func (_u *CompositeModelRouteUpdate) RemovePermittedUserIDs(ids ...int64) *CompositeModelRouteUpdate {
+	_u.mutation.RemovePermittedUserIDs(ids...)
+	return _u
+}
+
+// RemovePermittedUsers removes "permitted_users" edges to User entities.
+func (_u *CompositeModelRouteUpdate) RemovePermittedUsers(v ...*User) *CompositeModelRouteUpdate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemovePermittedUserIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -363,6 +400,63 @@ func (_u *CompositeModelRouteUpdate) sqlSave(ctx context.Context) (_node int, er
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.PermittedUsersCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   compositemodelroute.PermittedUsersTable,
+			Columns: compositemodelroute.PermittedUsersPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(user.FieldID, field.TypeInt64),
+			},
+		}
+		createE := &UserModelPermissionCreate{config: _u.config, mutation: newUserModelPermissionMutation(_u.config, OpCreate)}
+		createE.defaults()
+		_, specE := createE.createSpec()
+		edge.Target.Fields = specE.Fields
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedPermittedUsersIDs(); len(nodes) > 0 && !_u.mutation.PermittedUsersCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   compositemodelroute.PermittedUsersTable,
+			Columns: compositemodelroute.PermittedUsersPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(user.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		createE := &UserModelPermissionCreate{config: _u.config, mutation: newUserModelPermissionMutation(_u.config, OpCreate)}
+		createE.defaults()
+		_, specE := createE.createSpec()
+		edge.Target.Fields = specE.Fields
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PermittedUsersIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   compositemodelroute.PermittedUsersTable,
+			Columns: compositemodelroute.PermittedUsersPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(user.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		createE := &UserModelPermissionCreate{config: _u.config, mutation: newUserModelPermissionMutation(_u.config, OpCreate)}
+		createE.defaults()
+		_, specE := createE.createSpec()
+		edge.Target.Fields = specE.Fields
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
@@ -555,6 +649,21 @@ func (_u *CompositeModelRouteUpdateOne) SetGroup(v *Group) *CompositeModelRouteU
 	return _u.SetGroupID(v.ID)
 }
 
+// AddPermittedUserIDs adds the "permitted_users" edge to the User entity by IDs.
+func (_u *CompositeModelRouteUpdateOne) AddPermittedUserIDs(ids ...int64) *CompositeModelRouteUpdateOne {
+	_u.mutation.AddPermittedUserIDs(ids...)
+	return _u
+}
+
+// AddPermittedUsers adds the "permitted_users" edges to the User entity.
+func (_u *CompositeModelRouteUpdateOne) AddPermittedUsers(v ...*User) *CompositeModelRouteUpdateOne {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddPermittedUserIDs(ids...)
+}
+
 // Mutation returns the CompositeModelRouteMutation object of the builder.
 func (_u *CompositeModelRouteUpdateOne) Mutation() *CompositeModelRouteMutation {
 	return _u.mutation
@@ -564,6 +673,27 @@ func (_u *CompositeModelRouteUpdateOne) Mutation() *CompositeModelRouteMutation 
 func (_u *CompositeModelRouteUpdateOne) ClearGroup() *CompositeModelRouteUpdateOne {
 	_u.mutation.ClearGroup()
 	return _u
+}
+
+// ClearPermittedUsers clears all "permitted_users" edges to the User entity.
+func (_u *CompositeModelRouteUpdateOne) ClearPermittedUsers() *CompositeModelRouteUpdateOne {
+	_u.mutation.ClearPermittedUsers()
+	return _u
+}
+
+// RemovePermittedUserIDs removes the "permitted_users" edge to User entities by IDs.
+func (_u *CompositeModelRouteUpdateOne) RemovePermittedUserIDs(ids ...int64) *CompositeModelRouteUpdateOne {
+	_u.mutation.RemovePermittedUserIDs(ids...)
+	return _u
+}
+
+// RemovePermittedUsers removes "permitted_users" edges to User entities.
+func (_u *CompositeModelRouteUpdateOne) RemovePermittedUsers(v ...*User) *CompositeModelRouteUpdateOne {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemovePermittedUserIDs(ids...)
 }
 
 // Where appends a list predicates to the CompositeModelRouteUpdate builder.
@@ -749,6 +879,63 @@ func (_u *CompositeModelRouteUpdateOne) sqlSave(ctx context.Context) (_node *Com
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.PermittedUsersCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   compositemodelroute.PermittedUsersTable,
+			Columns: compositemodelroute.PermittedUsersPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(user.FieldID, field.TypeInt64),
+			},
+		}
+		createE := &UserModelPermissionCreate{config: _u.config, mutation: newUserModelPermissionMutation(_u.config, OpCreate)}
+		createE.defaults()
+		_, specE := createE.createSpec()
+		edge.Target.Fields = specE.Fields
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedPermittedUsersIDs(); len(nodes) > 0 && !_u.mutation.PermittedUsersCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   compositemodelroute.PermittedUsersTable,
+			Columns: compositemodelroute.PermittedUsersPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(user.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		createE := &UserModelPermissionCreate{config: _u.config, mutation: newUserModelPermissionMutation(_u.config, OpCreate)}
+		createE.defaults()
+		_, specE := createE.createSpec()
+		edge.Target.Fields = specE.Fields
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PermittedUsersIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   compositemodelroute.PermittedUsersTable,
+			Columns: compositemodelroute.PermittedUsersPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(user.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		createE := &UserModelPermissionCreate{config: _u.config, mutation: newUserModelPermissionMutation(_u.config, OpCreate)}
+		createE.defaults()
+		_, specE := createE.createSpec()
+		edge.Target.Fields = specE.Fields
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_node = &CompositeModelRoute{config: _u.config}

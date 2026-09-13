@@ -52,9 +52,13 @@ type CompositeModelRoute struct {
 type CompositeModelRouteEdges struct {
 	// Group holds the value of the group edge.
 	Group *Group `json:"group,omitempty"`
+	// PermittedUsers holds the value of the permitted_users edge.
+	PermittedUsers []*User `json:"permitted_users,omitempty"`
+	// ModelPermissions holds the value of the model_permissions edge.
+	ModelPermissions []*UserModelPermission `json:"model_permissions,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [1]bool
+	loadedTypes [3]bool
 }
 
 // GroupOrErr returns the Group value or an error if the edge
@@ -66,6 +70,24 @@ func (e CompositeModelRouteEdges) GroupOrErr() (*Group, error) {
 		return nil, &NotFoundError{label: group.Label}
 	}
 	return nil, &NotLoadedError{edge: "group"}
+}
+
+// PermittedUsersOrErr returns the PermittedUsers value or an error if the edge
+// was not loaded in eager-loading.
+func (e CompositeModelRouteEdges) PermittedUsersOrErr() ([]*User, error) {
+	if e.loadedTypes[1] {
+		return e.PermittedUsers, nil
+	}
+	return nil, &NotLoadedError{edge: "permitted_users"}
+}
+
+// ModelPermissionsOrErr returns the ModelPermissions value or an error if the edge
+// was not loaded in eager-loading.
+func (e CompositeModelRouteEdges) ModelPermissionsOrErr() ([]*UserModelPermission, error) {
+	if e.loadedTypes[2] {
+		return e.ModelPermissions, nil
+	}
+	return nil, &NotLoadedError{edge: "model_permissions"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -192,6 +214,16 @@ func (_m *CompositeModelRoute) Value(name string) (ent.Value, error) {
 // QueryGroup queries the "group" edge of the CompositeModelRoute entity.
 func (_m *CompositeModelRoute) QueryGroup() *GroupQuery {
 	return NewCompositeModelRouteClient(_m.config).QueryGroup(_m)
+}
+
+// QueryPermittedUsers queries the "permitted_users" edge of the CompositeModelRoute entity.
+func (_m *CompositeModelRoute) QueryPermittedUsers() *UserQuery {
+	return NewCompositeModelRouteClient(_m.config).QueryPermittedUsers(_m)
+}
+
+// QueryModelPermissions queries the "model_permissions" edge of the CompositeModelRoute entity.
+func (_m *CompositeModelRoute) QueryModelPermissions() *UserModelPermissionQuery {
+	return NewCompositeModelRouteClient(_m.config).QueryModelPermissions(_m)
 }
 
 // Update returns a builder for updating this CompositeModelRoute.

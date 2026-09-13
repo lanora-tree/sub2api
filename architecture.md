@@ -108,6 +108,8 @@ flowchart TD
 3. 路由被停用时权限自动失效。
 4. 权限查询可以缓存到 Redis，PostgreSQL 是权威来源。
 
+M6.3 先采用 PostgreSQL 直接查询并 fail closed，不在缺少缓存时降级放行。管理员通过带强 ETag 的完整替换 API 更新权限集合，事务级 advisory lock 与版本比较阻止并发覆盖。Gateway 只把 Composite exact Route 视为可授权身份；detector/account ownership 的隐式结果不能绕过授权。模型目录使用相同权限来源，空权限返回空目录且不回退到静态模型。
+
 ## 5. 请求流
 
 ```mermaid

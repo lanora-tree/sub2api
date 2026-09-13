@@ -453,6 +453,18 @@ func (f UserAttributeValueFunc) Mutate(ctx context.Context, m ent.Mutation) (ent
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.UserAttributeValueMutation", m)
 }
 
+// The UserModelPermissionFunc type is an adapter to allow the use of ordinary
+// function as UserModelPermission mutator.
+type UserModelPermissionFunc func(context.Context, *ent.UserModelPermissionMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f UserModelPermissionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.UserModelPermissionMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.UserModelPermissionMutation", m)
+}
+
 // The UserPlatformQuotaFunc type is an adapter to allow the use of ordinary
 // function as UserPlatformQuota mutator.
 type UserPlatformQuotaFunc func(context.Context, *ent.UserPlatformQuotaMutation) (ent.Value, error)

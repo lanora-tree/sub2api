@@ -77,6 +77,8 @@ const (
 	EdgeAnnouncementReads = "announcement_reads"
 	// EdgeAllowedGroups holds the string denoting the allowed_groups edge name in mutations.
 	EdgeAllowedGroups = "allowed_groups"
+	// EdgeModelRoutes holds the string denoting the model_routes edge name in mutations.
+	EdgeModelRoutes = "model_routes"
 	// EdgeUsageLogs holds the string denoting the usage_logs edge name in mutations.
 	EdgeUsageLogs = "usage_logs"
 	// EdgeAttributeValues holds the string denoting the attribute_values edge name in mutations.
@@ -97,6 +99,8 @@ const (
 	EdgeOperatedWalletTransactions = "operated_wallet_transactions"
 	// EdgeUserAllowedGroups holds the string denoting the user_allowed_groups edge name in mutations.
 	EdgeUserAllowedGroups = "user_allowed_groups"
+	// EdgeModelPermissions holds the string denoting the model_permissions edge name in mutations.
+	EdgeModelPermissions = "model_permissions"
 	// Table holds the table name of the user in the database.
 	Table = "users"
 	// APIKeysTable is the table that holds the api_keys relation/edge.
@@ -139,6 +143,11 @@ const (
 	// AllowedGroupsInverseTable is the table name for the Group entity.
 	// It exists in this package in order to avoid circular dependency with the "group" package.
 	AllowedGroupsInverseTable = "groups"
+	// ModelRoutesTable is the table that holds the model_routes relation/edge. The primary key declared below.
+	ModelRoutesTable = "user_model_permissions"
+	// ModelRoutesInverseTable is the table name for the CompositeModelRoute entity.
+	// It exists in this package in order to avoid circular dependency with the "compositemodelroute" package.
+	ModelRoutesInverseTable = "composite_model_routes"
 	// UsageLogsTable is the table that holds the usage_logs relation/edge.
 	UsageLogsTable = "usage_logs"
 	// UsageLogsInverseTable is the table name for the UsageLog entity.
@@ -209,6 +218,13 @@ const (
 	UserAllowedGroupsInverseTable = "user_allowed_groups"
 	// UserAllowedGroupsColumn is the table column denoting the user_allowed_groups relation/edge.
 	UserAllowedGroupsColumn = "user_id"
+	// ModelPermissionsTable is the table that holds the model_permissions relation/edge.
+	ModelPermissionsTable = "user_model_permissions"
+	// ModelPermissionsInverseTable is the table name for the UserModelPermission entity.
+	// It exists in this package in order to avoid circular dependency with the "usermodelpermission" package.
+	ModelPermissionsInverseTable = "user_model_permissions"
+	// ModelPermissionsColumn is the table column denoting the model_permissions relation/edge.
+	ModelPermissionsColumn = "user_id"
 )
 
 // Columns holds all SQL columns for user fields.
@@ -245,6 +261,9 @@ var (
 	// AllowedGroupsPrimaryKey and AllowedGroupsColumn2 are the table columns denoting the
 	// primary key for the allowed_groups relation (M2M).
 	AllowedGroupsPrimaryKey = []string{"user_id", "group_id"}
+	// ModelRoutesPrimaryKey and ModelRoutesColumn2 are the table columns denoting the
+	// primary key for the model_routes relation (M2M).
+	ModelRoutesPrimaryKey = []string{"user_id", "route_id"}
 )
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -532,6 +551,20 @@ func ByAllowedGroups(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
+// ByModelRoutesCount orders the results by model_routes count.
+func ByModelRoutesCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newModelRoutesStep(), opts...)
+	}
+}
+
+// ByModelRoutes orders the results by model_routes terms.
+func ByModelRoutes(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newModelRoutesStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByUsageLogsCount orders the results by usage_logs count.
 func ByUsageLogsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -671,6 +704,20 @@ func ByUserAllowedGroups(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption
 		sqlgraph.OrderByNeighborTerms(s, newUserAllowedGroupsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// ByModelPermissionsCount orders the results by model_permissions count.
+func ByModelPermissionsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newModelPermissionsStep(), opts...)
+	}
+}
+
+// ByModelPermissions orders the results by model_permissions terms.
+func ByModelPermissions(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newModelPermissionsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newAPIKeysStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -711,6 +758,13 @@ func newAllowedGroupsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(AllowedGroupsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2M, false, AllowedGroupsTable, AllowedGroupsPrimaryKey...),
+	)
+}
+func newModelRoutesStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ModelRoutesInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2M, false, ModelRoutesTable, ModelRoutesPrimaryKey...),
 	)
 }
 func newUsageLogsStep() *sqlgraph.Step {
@@ -781,5 +835,12 @@ func newUserAllowedGroupsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(UserAllowedGroupsInverseTable, UserAllowedGroupsColumn),
 		sqlgraph.Edge(sqlgraph.O2M, true, UserAllowedGroupsTable, UserAllowedGroupsColumn),
+	)
+}
+func newModelPermissionsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ModelPermissionsInverseTable, ModelPermissionsColumn),
+		sqlgraph.Edge(sqlgraph.O2M, true, ModelPermissionsTable, ModelPermissionsColumn),
 	)
 }

@@ -50,6 +50,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/userallowedgroup"
 	"github.com/Wei-Shaw/sub2api/ent/userattributedefinition"
 	"github.com/Wei-Shaw/sub2api/ent/userattributevalue"
+	"github.com/Wei-Shaw/sub2api/ent/usermodelpermission"
 	"github.com/Wei-Shaw/sub2api/ent/userplatformquota"
 	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
 	"github.com/Wei-Shaw/sub2api/ent/wallettransaction"
@@ -103,6 +104,7 @@ const (
 	TypeUserAllowedGroup              = "UserAllowedGroup"
 	TypeUserAttributeDefinition       = "UserAttributeDefinition"
 	TypeUserAttributeValue            = "UserAttributeValue"
+	TypeUserModelPermission           = "UserModelPermission"
 	TypeUserPlatformQuota             = "UserPlatformQuota"
 	TypeUserSubscription              = "UserSubscription"
 	TypeWalletTransaction             = "WalletTransaction"
@@ -19710,27 +19712,30 @@ func (m *ChannelMonitorRequestTemplateMutation) ResetEdge(name string) error {
 // CompositeModelRouteMutation represents an operation that mutates the CompositeModelRoute nodes in the graph.
 type CompositeModelRouteMutation struct {
 	config
-	op              Op
-	typ             string
-	id              *int64
-	created_at      *time.Time
-	updated_at      *time.Time
-	deleted_at      *time.Time
-	public_model    *string
-	match_type      *string
-	target_platform *string
-	upstream_model  *string
-	endpoint        *string
-	priority        *int
-	addpriority     *int
-	enabled         *bool
-	notes           *string
-	clearedFields   map[string]struct{}
-	group           *int64
-	clearedgroup    bool
-	done            bool
-	oldValue        func(context.Context) (*CompositeModelRoute, error)
-	predicates      []predicate.CompositeModelRoute
+	op                     Op
+	typ                    string
+	id                     *int64
+	created_at             *time.Time
+	updated_at             *time.Time
+	deleted_at             *time.Time
+	public_model           *string
+	match_type             *string
+	target_platform        *string
+	upstream_model         *string
+	endpoint               *string
+	priority               *int
+	addpriority            *int
+	enabled                *bool
+	notes                  *string
+	clearedFields          map[string]struct{}
+	group                  *int64
+	clearedgroup           bool
+	permitted_users        map[int64]struct{}
+	removedpermitted_users map[int64]struct{}
+	clearedpermitted_users bool
+	done                   bool
+	oldValue               func(context.Context) (*CompositeModelRoute, error)
+	predicates             []predicate.CompositeModelRoute
 }
 
 var _ ent.Mutation = (*CompositeModelRouteMutation)(nil)
@@ -20336,6 +20341,60 @@ func (m *CompositeModelRouteMutation) ResetGroup() {
 	m.clearedgroup = false
 }
 
+// AddPermittedUserIDs adds the "permitted_users" edge to the User entity by ids.
+func (m *CompositeModelRouteMutation) AddPermittedUserIDs(ids ...int64) {
+	if m.permitted_users == nil {
+		m.permitted_users = make(map[int64]struct{})
+	}
+	for i := range ids {
+		m.permitted_users[ids[i]] = struct{}{}
+	}
+}
+
+// ClearPermittedUsers clears the "permitted_users" edge to the User entity.
+func (m *CompositeModelRouteMutation) ClearPermittedUsers() {
+	m.clearedpermitted_users = true
+}
+
+// PermittedUsersCleared reports if the "permitted_users" edge to the User entity was cleared.
+func (m *CompositeModelRouteMutation) PermittedUsersCleared() bool {
+	return m.clearedpermitted_users
+}
+
+// RemovePermittedUserIDs removes the "permitted_users" edge to the User entity by IDs.
+func (m *CompositeModelRouteMutation) RemovePermittedUserIDs(ids ...int64) {
+	if m.removedpermitted_users == nil {
+		m.removedpermitted_users = make(map[int64]struct{})
+	}
+	for i := range ids {
+		delete(m.permitted_users, ids[i])
+		m.removedpermitted_users[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedPermittedUsers returns the removed IDs of the "permitted_users" edge to the User entity.
+func (m *CompositeModelRouteMutation) RemovedPermittedUsersIDs() (ids []int64) {
+	for id := range m.removedpermitted_users {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// PermittedUsersIDs returns the "permitted_users" edge IDs in the mutation.
+func (m *CompositeModelRouteMutation) PermittedUsersIDs() (ids []int64) {
+	for id := range m.permitted_users {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetPermittedUsers resets all changes to the "permitted_users" edge.
+func (m *CompositeModelRouteMutation) ResetPermittedUsers() {
+	m.permitted_users = nil
+	m.clearedpermitted_users = false
+	m.removedpermitted_users = nil
+}
+
 // Where appends a list predicates to the CompositeModelRouteMutation builder.
 func (m *CompositeModelRouteMutation) Where(ps ...predicate.CompositeModelRoute) {
 	m.predicates = append(m.predicates, ps...)
@@ -20686,9 +20745,12 @@ func (m *CompositeModelRouteMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *CompositeModelRouteMutation) AddedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.group != nil {
 		edges = append(edges, compositemodelroute.EdgeGroup)
+	}
+	if m.permitted_users != nil {
+		edges = append(edges, compositemodelroute.EdgePermittedUsers)
 	}
 	return edges
 }
@@ -20701,27 +20763,47 @@ func (m *CompositeModelRouteMutation) AddedIDs(name string) []ent.Value {
 		if id := m.group; id != nil {
 			return []ent.Value{*id}
 		}
+	case compositemodelroute.EdgePermittedUsers:
+		ids := make([]ent.Value, 0, len(m.permitted_users))
+		for id := range m.permitted_users {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *CompositeModelRouteMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
+	if m.removedpermitted_users != nil {
+		edges = append(edges, compositemodelroute.EdgePermittedUsers)
+	}
 	return edges
 }
 
 // RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
 // the given name in this mutation.
 func (m *CompositeModelRouteMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case compositemodelroute.EdgePermittedUsers:
+		ids := make([]ent.Value, 0, len(m.removedpermitted_users))
+		for id := range m.removedpermitted_users {
+			ids = append(ids, id)
+		}
+		return ids
+	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *CompositeModelRouteMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.clearedgroup {
 		edges = append(edges, compositemodelroute.EdgeGroup)
+	}
+	if m.clearedpermitted_users {
+		edges = append(edges, compositemodelroute.EdgePermittedUsers)
 	}
 	return edges
 }
@@ -20732,6 +20814,8 @@ func (m *CompositeModelRouteMutation) EdgeCleared(name string) bool {
 	switch name {
 	case compositemodelroute.EdgeGroup:
 		return m.clearedgroup
+	case compositemodelroute.EdgePermittedUsers:
+		return m.clearedpermitted_users
 	}
 	return false
 }
@@ -20753,6 +20837,9 @@ func (m *CompositeModelRouteMutation) ResetEdge(name string) error {
 	switch name {
 	case compositemodelroute.EdgeGroup:
 		m.ResetGroup()
+		return nil
+	case compositemodelroute.EdgePermittedUsers:
+		m.ResetPermittedUsers()
 		return nil
 	}
 	return fmt.Errorf("unknown CompositeModelRoute edge %s", name)
@@ -48616,6 +48703,9 @@ type UserMutation struct {
 	allowed_groups                      map[int64]struct{}
 	removedallowed_groups               map[int64]struct{}
 	clearedallowed_groups               bool
+	model_routes                        map[int64]struct{}
+	removedmodel_routes                 map[int64]struct{}
+	clearedmodel_routes                 bool
 	usage_logs                          map[int64]struct{}
 	removedusage_logs                   map[int64]struct{}
 	clearedusage_logs                   bool
@@ -50169,6 +50259,60 @@ func (m *UserMutation) ResetAllowedGroups() {
 	m.removedallowed_groups = nil
 }
 
+// AddModelRouteIDs adds the "model_routes" edge to the CompositeModelRoute entity by ids.
+func (m *UserMutation) AddModelRouteIDs(ids ...int64) {
+	if m.model_routes == nil {
+		m.model_routes = make(map[int64]struct{})
+	}
+	for i := range ids {
+		m.model_routes[ids[i]] = struct{}{}
+	}
+}
+
+// ClearModelRoutes clears the "model_routes" edge to the CompositeModelRoute entity.
+func (m *UserMutation) ClearModelRoutes() {
+	m.clearedmodel_routes = true
+}
+
+// ModelRoutesCleared reports if the "model_routes" edge to the CompositeModelRoute entity was cleared.
+func (m *UserMutation) ModelRoutesCleared() bool {
+	return m.clearedmodel_routes
+}
+
+// RemoveModelRouteIDs removes the "model_routes" edge to the CompositeModelRoute entity by IDs.
+func (m *UserMutation) RemoveModelRouteIDs(ids ...int64) {
+	if m.removedmodel_routes == nil {
+		m.removedmodel_routes = make(map[int64]struct{})
+	}
+	for i := range ids {
+		delete(m.model_routes, ids[i])
+		m.removedmodel_routes[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedModelRoutes returns the removed IDs of the "model_routes" edge to the CompositeModelRoute entity.
+func (m *UserMutation) RemovedModelRoutesIDs() (ids []int64) {
+	for id := range m.removedmodel_routes {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ModelRoutesIDs returns the "model_routes" edge IDs in the mutation.
+func (m *UserMutation) ModelRoutesIDs() (ids []int64) {
+	for id := range m.model_routes {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetModelRoutes resets all changes to the "model_routes" edge.
+func (m *UserMutation) ResetModelRoutes() {
+	m.model_routes = nil
+	m.clearedmodel_routes = false
+	m.removedmodel_routes = nil
+}
+
 // AddUsageLogIDs adds the "usage_logs" edge to the UsageLog entity by ids.
 func (m *UserMutation) AddUsageLogIDs(ids ...int64) {
 	if m.usage_logs == nil {
@@ -51310,7 +51454,7 @@ func (m *UserMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *UserMutation) AddedEdges() []string {
-	edges := make([]string, 0, 15)
+	edges := make([]string, 0, 16)
 	if m.api_keys != nil {
 		edges = append(edges, user.EdgeAPIKeys)
 	}
@@ -51328,6 +51472,9 @@ func (m *UserMutation) AddedEdges() []string {
 	}
 	if m.allowed_groups != nil {
 		edges = append(edges, user.EdgeAllowedGroups)
+	}
+	if m.model_routes != nil {
+		edges = append(edges, user.EdgeModelRoutes)
 	}
 	if m.usage_logs != nil {
 		edges = append(edges, user.EdgeUsageLogs)
@@ -51399,6 +51546,12 @@ func (m *UserMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case user.EdgeModelRoutes:
+		ids := make([]ent.Value, 0, len(m.model_routes))
+		for id := range m.model_routes {
+			ids = append(ids, id)
+		}
+		return ids
 	case user.EdgeUsageLogs:
 		ids := make([]ent.Value, 0, len(m.usage_logs))
 		for id := range m.usage_logs {
@@ -51459,7 +51612,7 @@ func (m *UserMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *UserMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 15)
+	edges := make([]string, 0, 16)
 	if m.removedapi_keys != nil {
 		edges = append(edges, user.EdgeAPIKeys)
 	}
@@ -51477,6 +51630,9 @@ func (m *UserMutation) RemovedEdges() []string {
 	}
 	if m.removedallowed_groups != nil {
 		edges = append(edges, user.EdgeAllowedGroups)
+	}
+	if m.removedmodel_routes != nil {
+		edges = append(edges, user.EdgeModelRoutes)
 	}
 	if m.removedusage_logs != nil {
 		edges = append(edges, user.EdgeUsageLogs)
@@ -51548,6 +51704,12 @@ func (m *UserMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case user.EdgeModelRoutes:
+		ids := make([]ent.Value, 0, len(m.removedmodel_routes))
+		for id := range m.removedmodel_routes {
+			ids = append(ids, id)
+		}
+		return ids
 	case user.EdgeUsageLogs:
 		ids := make([]ent.Value, 0, len(m.removedusage_logs))
 		for id := range m.removedusage_logs {
@@ -51608,7 +51770,7 @@ func (m *UserMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *UserMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 15)
+	edges := make([]string, 0, 16)
 	if m.clearedapi_keys {
 		edges = append(edges, user.EdgeAPIKeys)
 	}
@@ -51626,6 +51788,9 @@ func (m *UserMutation) ClearedEdges() []string {
 	}
 	if m.clearedallowed_groups {
 		edges = append(edges, user.EdgeAllowedGroups)
+	}
+	if m.clearedmodel_routes {
+		edges = append(edges, user.EdgeModelRoutes)
 	}
 	if m.clearedusage_logs {
 		edges = append(edges, user.EdgeUsageLogs)
@@ -51673,6 +51838,8 @@ func (m *UserMutation) EdgeCleared(name string) bool {
 		return m.clearedannouncement_reads
 	case user.EdgeAllowedGroups:
 		return m.clearedallowed_groups
+	case user.EdgeModelRoutes:
+		return m.clearedmodel_routes
 	case user.EdgeUsageLogs:
 		return m.clearedusage_logs
 	case user.EdgeAttributeValues:
@@ -51724,6 +51891,9 @@ func (m *UserMutation) ResetEdge(name string) error {
 		return nil
 	case user.EdgeAllowedGroups:
 		m.ResetAllowedGroups()
+		return nil
+	case user.EdgeModelRoutes:
+		m.ResetModelRoutes()
 		return nil
 	case user.EdgeUsageLogs:
 		m.ResetUsageLogs()
@@ -53970,6 +54140,561 @@ func (m *UserAttributeValueMutation) ResetEdge(name string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown UserAttributeValue edge %s", name)
+}
+
+// UserModelPermissionMutation represents an operation that mutates the UserModelPermission nodes in the graph.
+type UserModelPermissionMutation struct {
+	config
+	op            Op
+	typ           string
+	enabled       *bool
+	created_by    *int64
+	addcreated_by *int64
+	created_at    *time.Time
+	updated_at    *time.Time
+	clearedFields map[string]struct{}
+	user          *int64
+	cleareduser   bool
+	route         *int64
+	clearedroute  bool
+	done          bool
+	oldValue      func(context.Context) (*UserModelPermission, error)
+	predicates    []predicate.UserModelPermission
+}
+
+var _ ent.Mutation = (*UserModelPermissionMutation)(nil)
+
+// usermodelpermissionOption allows management of the mutation configuration using functional options.
+type usermodelpermissionOption func(*UserModelPermissionMutation)
+
+// newUserModelPermissionMutation creates new mutation for the UserModelPermission entity.
+func newUserModelPermissionMutation(c config, op Op, opts ...usermodelpermissionOption) *UserModelPermissionMutation {
+	m := &UserModelPermissionMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeUserModelPermission,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m UserModelPermissionMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m UserModelPermissionMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetUserID sets the "user_id" field.
+func (m *UserModelPermissionMutation) SetUserID(i int64) {
+	m.user = &i
+}
+
+// UserID returns the value of the "user_id" field in the mutation.
+func (m *UserModelPermissionMutation) UserID() (r int64, exists bool) {
+	v := m.user
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetUserID resets all changes to the "user_id" field.
+func (m *UserModelPermissionMutation) ResetUserID() {
+	m.user = nil
+}
+
+// SetRouteID sets the "route_id" field.
+func (m *UserModelPermissionMutation) SetRouteID(i int64) {
+	m.route = &i
+}
+
+// RouteID returns the value of the "route_id" field in the mutation.
+func (m *UserModelPermissionMutation) RouteID() (r int64, exists bool) {
+	v := m.route
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRouteID resets all changes to the "route_id" field.
+func (m *UserModelPermissionMutation) ResetRouteID() {
+	m.route = nil
+}
+
+// SetEnabled sets the "enabled" field.
+func (m *UserModelPermissionMutation) SetEnabled(b bool) {
+	m.enabled = &b
+}
+
+// Enabled returns the value of the "enabled" field in the mutation.
+func (m *UserModelPermissionMutation) Enabled() (r bool, exists bool) {
+	v := m.enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetEnabled resets all changes to the "enabled" field.
+func (m *UserModelPermissionMutation) ResetEnabled() {
+	m.enabled = nil
+}
+
+// SetCreatedBy sets the "created_by" field.
+func (m *UserModelPermissionMutation) SetCreatedBy(i int64) {
+	m.created_by = &i
+	m.addcreated_by = nil
+}
+
+// CreatedBy returns the value of the "created_by" field in the mutation.
+func (m *UserModelPermissionMutation) CreatedBy() (r int64, exists bool) {
+	v := m.created_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// AddCreatedBy adds i to the "created_by" field.
+func (m *UserModelPermissionMutation) AddCreatedBy(i int64) {
+	if m.addcreated_by != nil {
+		*m.addcreated_by += i
+	} else {
+		m.addcreated_by = &i
+	}
+}
+
+// AddedCreatedBy returns the value that was added to the "created_by" field in this mutation.
+func (m *UserModelPermissionMutation) AddedCreatedBy() (r int64, exists bool) {
+	v := m.addcreated_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetCreatedBy resets all changes to the "created_by" field.
+func (m *UserModelPermissionMutation) ResetCreatedBy() {
+	m.created_by = nil
+	m.addcreated_by = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *UserModelPermissionMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *UserModelPermissionMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *UserModelPermissionMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *UserModelPermissionMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *UserModelPermissionMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *UserModelPermissionMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// ClearUser clears the "user" edge to the User entity.
+func (m *UserModelPermissionMutation) ClearUser() {
+	m.cleareduser = true
+	m.clearedFields[usermodelpermission.FieldUserID] = struct{}{}
+}
+
+// UserCleared reports if the "user" edge to the User entity was cleared.
+func (m *UserModelPermissionMutation) UserCleared() bool {
+	return m.cleareduser
+}
+
+// UserIDs returns the "user" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// UserID instead. It exists only for internal usage by the builders.
+func (m *UserModelPermissionMutation) UserIDs() (ids []int64) {
+	if id := m.user; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetUser resets all changes to the "user" edge.
+func (m *UserModelPermissionMutation) ResetUser() {
+	m.user = nil
+	m.cleareduser = false
+}
+
+// ClearRoute clears the "route" edge to the CompositeModelRoute entity.
+func (m *UserModelPermissionMutation) ClearRoute() {
+	m.clearedroute = true
+	m.clearedFields[usermodelpermission.FieldRouteID] = struct{}{}
+}
+
+// RouteCleared reports if the "route" edge to the CompositeModelRoute entity was cleared.
+func (m *UserModelPermissionMutation) RouteCleared() bool {
+	return m.clearedroute
+}
+
+// RouteIDs returns the "route" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// RouteID instead. It exists only for internal usage by the builders.
+func (m *UserModelPermissionMutation) RouteIDs() (ids []int64) {
+	if id := m.route; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetRoute resets all changes to the "route" edge.
+func (m *UserModelPermissionMutation) ResetRoute() {
+	m.route = nil
+	m.clearedroute = false
+}
+
+// Where appends a list predicates to the UserModelPermissionMutation builder.
+func (m *UserModelPermissionMutation) Where(ps ...predicate.UserModelPermission) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the UserModelPermissionMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *UserModelPermissionMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.UserModelPermission, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *UserModelPermissionMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *UserModelPermissionMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (UserModelPermission).
+func (m *UserModelPermissionMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *UserModelPermissionMutation) Fields() []string {
+	fields := make([]string, 0, 6)
+	if m.user != nil {
+		fields = append(fields, usermodelpermission.FieldUserID)
+	}
+	if m.route != nil {
+		fields = append(fields, usermodelpermission.FieldRouteID)
+	}
+	if m.enabled != nil {
+		fields = append(fields, usermodelpermission.FieldEnabled)
+	}
+	if m.created_by != nil {
+		fields = append(fields, usermodelpermission.FieldCreatedBy)
+	}
+	if m.created_at != nil {
+		fields = append(fields, usermodelpermission.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, usermodelpermission.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *UserModelPermissionMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case usermodelpermission.FieldUserID:
+		return m.UserID()
+	case usermodelpermission.FieldRouteID:
+		return m.RouteID()
+	case usermodelpermission.FieldEnabled:
+		return m.Enabled()
+	case usermodelpermission.FieldCreatedBy:
+		return m.CreatedBy()
+	case usermodelpermission.FieldCreatedAt:
+		return m.CreatedAt()
+	case usermodelpermission.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *UserModelPermissionMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	return nil, errors.New("edge schema UserModelPermission does not support getting old values")
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *UserModelPermissionMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case usermodelpermission.FieldUserID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserID(v)
+		return nil
+	case usermodelpermission.FieldRouteID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRouteID(v)
+		return nil
+	case usermodelpermission.FieldEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEnabled(v)
+		return nil
+	case usermodelpermission.FieldCreatedBy:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedBy(v)
+		return nil
+	case usermodelpermission.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case usermodelpermission.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown UserModelPermission field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *UserModelPermissionMutation) AddedFields() []string {
+	var fields []string
+	if m.addcreated_by != nil {
+		fields = append(fields, usermodelpermission.FieldCreatedBy)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *UserModelPermissionMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case usermodelpermission.FieldCreatedBy:
+		return m.AddedCreatedBy()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *UserModelPermissionMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case usermodelpermission.FieldCreatedBy:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCreatedBy(v)
+		return nil
+	}
+	return fmt.Errorf("unknown UserModelPermission numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *UserModelPermissionMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *UserModelPermissionMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *UserModelPermissionMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown UserModelPermission nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *UserModelPermissionMutation) ResetField(name string) error {
+	switch name {
+	case usermodelpermission.FieldUserID:
+		m.ResetUserID()
+		return nil
+	case usermodelpermission.FieldRouteID:
+		m.ResetRouteID()
+		return nil
+	case usermodelpermission.FieldEnabled:
+		m.ResetEnabled()
+		return nil
+	case usermodelpermission.FieldCreatedBy:
+		m.ResetCreatedBy()
+		return nil
+	case usermodelpermission.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case usermodelpermission.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown UserModelPermission field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *UserModelPermissionMutation) AddedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.user != nil {
+		edges = append(edges, usermodelpermission.EdgeUser)
+	}
+	if m.route != nil {
+		edges = append(edges, usermodelpermission.EdgeRoute)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *UserModelPermissionMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case usermodelpermission.EdgeUser:
+		if id := m.user; id != nil {
+			return []ent.Value{*id}
+		}
+	case usermodelpermission.EdgeRoute:
+		if id := m.route; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *UserModelPermissionMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 2)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *UserModelPermissionMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *UserModelPermissionMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.cleareduser {
+		edges = append(edges, usermodelpermission.EdgeUser)
+	}
+	if m.clearedroute {
+		edges = append(edges, usermodelpermission.EdgeRoute)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *UserModelPermissionMutation) EdgeCleared(name string) bool {
+	switch name {
+	case usermodelpermission.EdgeUser:
+		return m.cleareduser
+	case usermodelpermission.EdgeRoute:
+		return m.clearedroute
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *UserModelPermissionMutation) ClearEdge(name string) error {
+	switch name {
+	case usermodelpermission.EdgeUser:
+		m.ClearUser()
+		return nil
+	case usermodelpermission.EdgeRoute:
+		m.ClearRoute()
+		return nil
+	}
+	return fmt.Errorf("unknown UserModelPermission unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *UserModelPermissionMutation) ResetEdge(name string) error {
+	switch name {
+	case usermodelpermission.EdgeUser:
+		m.ResetUser()
+		return nil
+	case usermodelpermission.EdgeRoute:
+		m.ResetRoute()
+		return nil
+	}
+	return fmt.Errorf("unknown UserModelPermission edge %s", name)
 }
 
 // UserPlatformQuotaMutation represents an operation that mutates the UserPlatformQuota nodes in the graph.

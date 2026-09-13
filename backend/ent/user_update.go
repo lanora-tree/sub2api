@@ -14,6 +14,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/announcementread"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/authidentity"
+	"github.com/Wei-Shaw/sub2api/ent/compositemodelroute"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
 	"github.com/Wei-Shaw/sub2api/ent/pendingauthsession"
@@ -537,6 +538,21 @@ func (_u *UserUpdate) AddAllowedGroups(v ...*Group) *UserUpdate {
 	return _u.AddAllowedGroupIDs(ids...)
 }
 
+// AddModelRouteIDs adds the "model_routes" edge to the CompositeModelRoute entity by IDs.
+func (_u *UserUpdate) AddModelRouteIDs(ids ...int64) *UserUpdate {
+	_u.mutation.AddModelRouteIDs(ids...)
+	return _u
+}
+
+// AddModelRoutes adds the "model_routes" edges to the CompositeModelRoute entity.
+func (_u *UserUpdate) AddModelRoutes(v ...*CompositeModelRoute) *UserUpdate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddModelRouteIDs(ids...)
+}
+
 // AddUsageLogIDs adds the "usage_logs" edge to the UsageLog entity by IDs.
 func (_u *UserUpdate) AddUsageLogIDs(ids ...int64) *UserUpdate {
 	_u.mutation.AddUsageLogIDs(ids...)
@@ -801,6 +817,27 @@ func (_u *UserUpdate) RemoveAllowedGroups(v ...*Group) *UserUpdate {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveAllowedGroupIDs(ids...)
+}
+
+// ClearModelRoutes clears all "model_routes" edges to the CompositeModelRoute entity.
+func (_u *UserUpdate) ClearModelRoutes() *UserUpdate {
+	_u.mutation.ClearModelRoutes()
+	return _u
+}
+
+// RemoveModelRouteIDs removes the "model_routes" edge to CompositeModelRoute entities by IDs.
+func (_u *UserUpdate) RemoveModelRouteIDs(ids ...int64) *UserUpdate {
+	_u.mutation.RemoveModelRouteIDs(ids...)
+	return _u
+}
+
+// RemoveModelRoutes removes "model_routes" edges to CompositeModelRoute entities.
+func (_u *UserUpdate) RemoveModelRoutes(v ...*CompositeModelRoute) *UserUpdate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveModelRouteIDs(ids...)
 }
 
 // ClearUsageLogs clears all "usage_logs" edges to the UsageLog entity.
@@ -1466,6 +1503,63 @@ func (_u *UserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		createE := &UserAllowedGroupCreate{config: _u.config, mutation: newUserAllowedGroupMutation(_u.config, OpCreate)}
+		createE.defaults()
+		_, specE := createE.createSpec()
+		edge.Target.Fields = specE.Fields
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ModelRoutesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   user.ModelRoutesTable,
+			Columns: user.ModelRoutesPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(compositemodelroute.FieldID, field.TypeInt64),
+			},
+		}
+		createE := &UserModelPermissionCreate{config: _u.config, mutation: newUserModelPermissionMutation(_u.config, OpCreate)}
+		createE.defaults()
+		_, specE := createE.createSpec()
+		edge.Target.Fields = specE.Fields
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedModelRoutesIDs(); len(nodes) > 0 && !_u.mutation.ModelRoutesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   user.ModelRoutesTable,
+			Columns: user.ModelRoutesPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(compositemodelroute.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		createE := &UserModelPermissionCreate{config: _u.config, mutation: newUserModelPermissionMutation(_u.config, OpCreate)}
+		createE.defaults()
+		_, specE := createE.createSpec()
+		edge.Target.Fields = specE.Fields
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ModelRoutesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   user.ModelRoutesTable,
+			Columns: user.ModelRoutesPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(compositemodelroute.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		createE := &UserModelPermissionCreate{config: _u.config, mutation: newUserModelPermissionMutation(_u.config, OpCreate)}
 		createE.defaults()
 		_, specE := createE.createSpec()
 		edge.Target.Fields = specE.Fields
@@ -2392,6 +2486,21 @@ func (_u *UserUpdateOne) AddAllowedGroups(v ...*Group) *UserUpdateOne {
 	return _u.AddAllowedGroupIDs(ids...)
 }
 
+// AddModelRouteIDs adds the "model_routes" edge to the CompositeModelRoute entity by IDs.
+func (_u *UserUpdateOne) AddModelRouteIDs(ids ...int64) *UserUpdateOne {
+	_u.mutation.AddModelRouteIDs(ids...)
+	return _u
+}
+
+// AddModelRoutes adds the "model_routes" edges to the CompositeModelRoute entity.
+func (_u *UserUpdateOne) AddModelRoutes(v ...*CompositeModelRoute) *UserUpdateOne {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddModelRouteIDs(ids...)
+}
+
 // AddUsageLogIDs adds the "usage_logs" edge to the UsageLog entity by IDs.
 func (_u *UserUpdateOne) AddUsageLogIDs(ids ...int64) *UserUpdateOne {
 	_u.mutation.AddUsageLogIDs(ids...)
@@ -2656,6 +2765,27 @@ func (_u *UserUpdateOne) RemoveAllowedGroups(v ...*Group) *UserUpdateOne {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveAllowedGroupIDs(ids...)
+}
+
+// ClearModelRoutes clears all "model_routes" edges to the CompositeModelRoute entity.
+func (_u *UserUpdateOne) ClearModelRoutes() *UserUpdateOne {
+	_u.mutation.ClearModelRoutes()
+	return _u
+}
+
+// RemoveModelRouteIDs removes the "model_routes" edge to CompositeModelRoute entities by IDs.
+func (_u *UserUpdateOne) RemoveModelRouteIDs(ids ...int64) *UserUpdateOne {
+	_u.mutation.RemoveModelRouteIDs(ids...)
+	return _u
+}
+
+// RemoveModelRoutes removes "model_routes" edges to CompositeModelRoute entities.
+func (_u *UserUpdateOne) RemoveModelRoutes(v ...*CompositeModelRoute) *UserUpdateOne {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveModelRouteIDs(ids...)
 }
 
 // ClearUsageLogs clears all "usage_logs" edges to the UsageLog entity.
@@ -3351,6 +3481,63 @@ func (_u *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		createE := &UserAllowedGroupCreate{config: _u.config, mutation: newUserAllowedGroupMutation(_u.config, OpCreate)}
+		createE.defaults()
+		_, specE := createE.createSpec()
+		edge.Target.Fields = specE.Fields
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ModelRoutesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   user.ModelRoutesTable,
+			Columns: user.ModelRoutesPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(compositemodelroute.FieldID, field.TypeInt64),
+			},
+		}
+		createE := &UserModelPermissionCreate{config: _u.config, mutation: newUserModelPermissionMutation(_u.config, OpCreate)}
+		createE.defaults()
+		_, specE := createE.createSpec()
+		edge.Target.Fields = specE.Fields
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedModelRoutesIDs(); len(nodes) > 0 && !_u.mutation.ModelRoutesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   user.ModelRoutesTable,
+			Columns: user.ModelRoutesPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(compositemodelroute.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		createE := &UserModelPermissionCreate{config: _u.config, mutation: newUserModelPermissionMutation(_u.config, OpCreate)}
+		createE.defaults()
+		_, specE := createE.createSpec()
+		edge.Target.Fields = specE.Fields
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ModelRoutesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   user.ModelRoutesTable,
+			Columns: user.ModelRoutesPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(compositemodelroute.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		createE := &UserModelPermissionCreate{config: _u.config, mutation: newUserModelPermissionMutation(_u.config, OpCreate)}
 		createE.defaults()
 		_, specE := createE.createSpec()
 		edge.Target.Fields = specE.Fields

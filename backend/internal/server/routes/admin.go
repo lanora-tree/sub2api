@@ -316,6 +316,8 @@ func registerUserManagementRoutes(admin *gin.RouterGroup, h *handler.Handlers, s
 		users.GET("/:id/wallet", h.Admin.User.GetWallet)
 		users.POST("/:id/wallet/transactions", gin.HandlerFunc(stepUpAuth), h.Admin.User.UpdateBalance)
 		users.POST("/:id/wallet/refunds", gin.HandlerFunc(stepUpAuth), h.Admin.User.RefundUsage)
+		users.GET("/:id/model-permissions", h.Admin.User.GetModelPermissions)
+		users.PUT("/:id/model-permissions", gin.HandlerFunc(stepUpAuth), h.Admin.User.ReplaceModelPermissions)
 		users.GET("/:id/api-keys", h.Admin.User.GetUserAPIKeys)
 		users.GET("/:id/usage", h.Admin.User.GetUserUsage)
 		users.GET("/:id/balance-history", h.Admin.User.GetBalanceHistory)

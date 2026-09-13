@@ -20,6 +20,12 @@ const (
 	// CompositeRouteSource 标识 composite 解析结果来自显式路由还是内置模型探测。
 	CompositeRouteSource Key = "ctx_composite_route_source"
 
+	// CompositeRouteID 是显式 Composite Route 的数据库 ID。
+	CompositeRouteID Key = "ctx_composite_route_id"
+
+	// AuthorizedModelIDs 是当前用户在 access Group 中可见的逻辑模型目录。
+	AuthorizedModelIDs Key = "ctx_authorized_model_ids"
+
 	// RequestID 为服务端生成/透传的请求 ID。
 	RequestID Key = "ctx_request_id"
 
