@@ -48,7 +48,7 @@ func TestEntSoftDelete_ApiKey_DefaultFilterAndSkip(t *testing.T) {
 		Name:   "soft-delete",
 		Status: service.StatusActive,
 	}
-	require.NoError(t, repo.Create(ctx, key), "create api key")
+	require.NoError(t, repo.Create(ctx, withTestAPIKeyCredential(key)), "create api key")
 
 	require.NoError(t, repo.Delete(ctx, key.ID), "soft delete api key")
 
@@ -80,7 +80,7 @@ func TestEntSoftDelete_ApiKey_DeleteIdempotent(t *testing.T) {
 		Name:   "soft-delete2",
 		Status: service.StatusActive,
 	}
-	require.NoError(t, repo.Create(ctx, key), "create api key")
+	require.NoError(t, repo.Create(ctx, withTestAPIKeyCredential(key)), "create api key")
 
 	require.NoError(t, repo.Delete(ctx, key.ID), "first delete")
 	require.NoError(t, repo.Delete(ctx, key.ID), "second delete should be idempotent")
@@ -100,7 +100,7 @@ func TestEntSoftDelete_ApiKey_HardDeleteViaSkipSoftDelete(t *testing.T) {
 		Name:   "soft-delete3",
 		Status: service.StatusActive,
 	}
-	require.NoError(t, repo.Create(ctx, key), "create api key")
+	require.NoError(t, repo.Create(ctx, withTestAPIKeyCredential(key)), "create api key")
 
 	require.NoError(t, repo.Delete(ctx, key.ID), "soft delete api key")
 

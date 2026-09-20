@@ -117,7 +117,7 @@ func TestGroupRepository_DeleteCascade_PreservesApiKeyGroupID(t *testing.T) {
 		GroupID: &targetGroup.ID,
 		Status:  service.StatusActive,
 	}
-	require.NoError(t, apiKeyRepo.Create(ctx, key))
+	require.NoError(t, apiKeyRepo.Create(ctx, withTestAPIKeyCredential(key)))
 
 	_, err = groupRepo.DeleteCascade(ctx, targetGroup.ID)
 	require.NoError(t, err)

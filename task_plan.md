@@ -2,11 +2,11 @@
 
 ## 1. 总体目标
 
-在尽量保留 Sub2API 上游结构的前提下，交付一个供 10 到 50 名可信用户使用的 AI API Gateway。V1 支持 Codex CLI、Cursor 和 OpenAI Compatible 客户端，提供三类独立 Provider、用户隔离、显式模型路由、人民币预付余额、实际用量结算、动态价格、价格历史、安全外部充值接口和可恢复部署。
+在尽量保留 Sub2API 上游结构的前提下，交付一个供 10 到 50 名可信用户使用的 AI API Gateway。V1 支持 Codex CLI、Cursor 和 OpenAI Compatible 客户端，提供三类独立 Provider、用户隔离、显式模型路由、人民币预付余额、实际用量结算、动态价格、价格历史、管理员人工调账和可恢复部署。用户自助或外部自动充值暂不进入 V1 上线范围。
 
 ## 2. 当前目标
 
-M0 固定基线、M1 设计与 M2 范围收口已完成。M6.1 的 CNY 钱包基础、M6.2 的管理员钱包操作与 M6.3 的 Composite 用户模型权限已于 2026-09-13 依次通过真实 PostgreSQL、完整前后端测试和本地升级库验收。当前按顺序进入 M6.4 API Key HMAC 摘要；凭据加密、对账任务和显式目标 Group 路由仍按后续 M6 子任务依次实施。
+M0 固定基线、M1 设计与 M2 范围收口已完成。M6.1 至 M6.4 已依次完成 CNY 钱包基础、管理员钱包操作、Composite 用户模型权限和 API Key HMAC 摘要，并于 2026-09-20 完成真实 PostgreSQL、完整前后端测试、候选镜像与隔离黑盒验收。当前按顺序进入 M6.5 上游账号凭据加密；对账任务和显式目标 Group 路由仍按后续 M6 子任务依次实施。V1 采用“用户独立余额、独立账单、共享上游 Group 账号池”，外部自动充值延期。
 
 基线：
 
@@ -23,6 +23,7 @@ M0 固定基线、M1 设计与 M2 范围收口已完成。M6.1 的 CNY 钱包基
 | `pending` | 尚未开始 |
 | `in_progress` | 正在执行，尚未验收 |
 | `blocked` | 存在明确阻塞，见 `findings.md` |
+| `deferred` | 已明确不进入当前 V1，上线后按独立变更重新评估 |
 | `completed` | 所有完成条件和测试均已通过 |
 
 每次只能有一个 Milestone 处于 `in_progress`。子任务可以保留 `pending` 或 `blocked`。
@@ -39,8 +40,8 @@ M0 固定基线、M1 设计与 M2 范围收口已完成。M6.1 的 CNY 钱包基
 | M5 | DeepSeek Official API | `pending` | M2，M6，M7，模型名人工确认 |
 | M6 | 用户、密钥、路由与钱包基础 | `in_progress` | M2；CNY 决策已确认 |
 | M7 | 动态价格与历史快照 | `pending` | M6 |
-| M8 | Internal Recharge API | `pending` | M6，安全密钥方案 |
-| M9 | 管理后台精简 | `pending` | M3 到 M8 |
+| M8 | Internal Recharge API | `deferred` | V1 只保留管理员人工调账；上线后再评估 |
+| M9 | 管理后台精简 | `pending` | M3 到 M7，管理员钱包操作 |
 | M10 | 用户后台精简 | `pending` | M6，M7，M9 |
 | M11 | Codex 与 Cursor 兼容验收 | `pending` | M3 到 M5，M10 |
 | M12 | 安全、并发与异常测试 | `pending` | M6 到 M11 |
@@ -49,7 +50,7 @@ M0 固定基线、M1 设计与 M2 范围收口已完成。M6.1 的 CNY 钱包基
 
 M1 文档已基于静态源码分析完成。Windows Docker Desktop 已解除 M0 的工具链阻塞，固定基线的镜像、全栈健康检查、后端与前端测试已通过。正式 Fork `https://github.com/lanora-tree/sub2api` 已创建并配置为 `origin`。管理员本人已完成上游合规声明，M0 测试 Group、User、Key、模拟 Gateway、Streaming 首包与用量落库均已验收；临时模拟上游已移除，测试账号保留为 inactive。
 
-正式执行顺序不是按 Milestone 编号机械递增。基线通过后的主路径为 `M2 -> M6 -> M7 -> M3/M4/M5`；M8 可在 M6 后与 M7 并行设计，但必须在 M12 前验收。M3 到 M5 在 M6、M7 前只允许使用 mock 或专用低额度账号做不收费的技术探测，不得标记 Provider Milestone 完成。
+正式执行顺序不是按 Milestone 编号机械递增。基线通过后的主路径为 `M2 -> M6 -> M7 -> M3/M4/M5 -> M9/M10`。M8 已延期，不再是 M9、M10、M12 或 V1 上线门禁；余额只能通过 M6.2 已建立的管理员钱包事务调整，禁止直接修改 `users.balance`。M3 到 M5 在 M6、M7 前只允许使用 mock 或专用低额度账号做不收费的技术探测，不得标记 Provider Milestone 完成。
 
 ## 5. M0 准备源码与基线运行
 
@@ -172,6 +173,7 @@ M1 文档已基于静态源码分析完成。Windows Docker Desktop 已解除 M0
 7. 上游账号凭据迁移到独立密钥加密存储。
 8. 建立账本对账任务和异常告警。
 9. 为 Composite Route 增加 `target_group_id` 和 `composite_explicit_routes_only`，并实现 V1 exact route 唯一约束、权限引用后的语义不可变规则和缓存失效。
+10. 支持多个本地用户以各自 API Key、余额、usage 和账单共享同一个目标 Group 账号池；任何用户都不能读取其他成员的 Key、余额、请求日志或账单。
 
 完成条件：
 
@@ -180,6 +182,7 @@ M1 文档已基于静态源码分析完成。Windows Docker Desktop 已解除 M0
 * 用户只读自己的余额、Key 和 usage。
 * 旧明文 Key 和账号 Secret 清除并完成轮换。
 * 同一 V1 逻辑模型和 endpoint 只命中一个启用的目标 Group，已授权 Route 不能原地改变授权语义。
+* 两个用户可共享同一目标 Group 账号池，但 Token 归属、余额扣减、usage、账单和退款始终按认证用户及其 API Key 独立记录；并发结算不会串账或超扣。
 
 ## 12. M7 动态价格系统
 
@@ -198,7 +201,9 @@ M1 文档已基于静态源码分析完成。Windows Docker Desktop 已解除 M0
 * 历史账单在调价后保持不变。
 * 价格修改有管理员审计记录。
 
-## 13. M8 Internal Recharge API
+## 13. M8 Internal Recharge API（V1 延期）
+
+状态：`deferred`。V1 不提供用户自助充值、支付回调或外部自动充值，只允许管理员通过 M6.2 的钱包事务执行充值、正负调账和退款。不得直接编辑 `users.balance`。以下任务保留为上线后的独立版本候选，不是当前上线门禁。
 
 任务：
 
@@ -316,12 +321,10 @@ flowchart TD
     M1[M1 设计文档] --> M2
     M2 --> M6[M6 用户 密钥 路由 钱包]
     M6 --> M7[M7 动态价格]
-    M6 --> M8[M8 外部充值]
     M6 --> P[M3 至 M5 Provider]
     M7 --> P
     P --> UI[M9 与 M10 前端]
     M7 --> UI
-    M8 --> UI
     UI --> M11[M11 客户端验收]
     M11 --> M12[M12 安全与异常]
     M12 --> M13[M13 生产部署]

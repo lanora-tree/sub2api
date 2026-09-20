@@ -4,12 +4,12 @@
 
 * 项目代号：中转站
 * 上游项目：Sub2API
-* 记录日期：2026-09-13 UTC+8
+* 记录日期：2026-09-20 UTC+8
 * 当前阶段：M6 用户、密钥、路由与钱包基础
 * 阶段状态：`in_progress`
-* 当前任务：M6.3 用户模型权限已完成；下一项 M6.4 API Key HMAC 摘要
+* 当前任务：M6.4 API Key HMAC 摘要已完成；下一项 M6.5 上游账号凭据加密
 
-M0、M1 与 M2 已完成。M6.1、M6.2 与 M6.3 已依次完成 CNY 钱包基础、管理员钱包操作和 Composite 用户模型权限，并通过真实 PostgreSQL、完整前后端回归和本地升级验收。M6 继续 `in_progress`，下一项为 API Key HMAC 摘要。未接入真实 Provider 凭据或真实收费数据。
+M0、M1 与 M2 已完成。M6.1 至 M6.4 已依次完成 CNY 钱包基础、管理员钱包操作、Composite 用户模型权限和 API Key HMAC 摘要，并通过真实 PostgreSQL、完整前后端回归、候选镜像和隔离黑盒验收。M6 继续 `in_progress`，下一项为上游账号凭据加密。V1 已确定采用“用户独立余额、独立账单、共享上游 Group 账号池”，外部自动充值延期；未接入真实 Provider 凭据或真实收费数据。
 
 ## 2. 里程碑看板
 
@@ -21,9 +21,9 @@ M0、M1 与 M2 已完成。M6.1、M6.2 与 M6.3 已依次完成 CNY 钱包基础
 | M3 | Codex Subscription 验证 | `pending` | 等待 M2、M6、M7、合规确认和合法测试账号 |
 | M4 | OpenAI Official API | `pending` | 等待 M2、M6、M7 的基础能力 |
 | M5 | DeepSeek Official API | `pending` | 等待 M2、M6、M7、模型名和价格人工确认 |
-| M6 | 用户、密钥、路由与钱包基础 | `in_progress` | M6.1-M6.3 已验收；下一项 M6.4 API Key HMAC 摘要 |
+| M6 | 用户、密钥、路由与钱包基础 | `in_progress` | M6.1-M6.4 已验收；下一项 M6.5 上游账号凭据加密 |
 | M7 | 动态价格与历史快照 | `pending` | 等待 M6 |
-| M8 | Internal Recharge API | `pending` | 等待 M6 和密钥方案 |
+| M8 | Internal Recharge API | `deferred` | V1 仅保留管理员人工调账；上线后再评估 |
 | M9 | 管理后台精简 | `pending` | 等待核心后端功能稳定 |
 | M10 | 用户后台精简 | `pending` | 等待 M6、M7、M9 |
 | M11 | Codex 与 Cursor 验收 | `pending` | 等待三个 Provider 可用 |
@@ -657,7 +657,77 @@ M6.1 完成并可形成独立提交。Migration 已在本地测试库执行，�
 * 模型目录尚未与 M7 有效价格求交；M7 完成前该分支不是可收费上线版本。Gateway usage 钱包结算、对账告警、API Key 摘要和 Account credential 加密也仍未完成。
 * 后台权限选择 UI 留在 M9；M6.3 已提供完整 Admin API 客户端契约。M6 下一顺序项为 M6.4 API Key HMAC 摘要与 Secret 一次展示。
 
-## 21. 后续记录模板
+## 21. 2026-09-14 / M6.4 开始：API Key HMAC 摘要与一次性 Secret
+
+### 目标与边界
+
+本子任务只处理用户 API Key 的生成、持久化、认证、轮换、缓存失效和一次性创建响应：数据库不再保留可恢复的 API Key 明文，列表/详情/幂等重放不返回 Secret。Account credential 加密、钱包 usage 原子结算、对账告警、价格门禁以及 Composite 精确目标 Group 路由仍属于后续任务；稳定的 M2 容器及其共享数据库在 M6.4 完成前不升级。
+
+### Schema、认证与缓存敏感改动说明
+
+* 原因：当前 `api_keys.key`、列表/详情 DTO 以及历史 `deleted_api_key_audits.key` 能保留或暴露完整 Secret；认证仓储也按明文查询，缓存键只是不带 Pepper 的普通 SHA-256。数据库或接口响应泄漏会直接暴露用户凭据。
+* 影响：新增 forward-only migration `243_api_key_hmac.sql`、Ent schema/生成代码、运行时 HMAC 配置与启动迁移、repository/service/auth cache、DTO/handler 幂等行为、Frontend 一次性 Secret 弹窗和对应测试。HMAC 使用独立 Pepper 和版本；缓存只接收 HMAC 摘要，不保存原始 API Key。
+* 轮换：认证先查 active version，在配置的 previous 接受窗口内允许 previous 命中并原子升级为 active；窗口截止后未迁移的旧版本 Key 被撤销。数据库精确摘要查询和原子升级避免逐行明文比较。
+* 回滚：该迁移清除数据库中的 API Key 明文，旧应用无法认证仅含摘要的 Key。生产回滚必须同时恢复升级前数据库备份与旧镜像，或采用后续 forward fix；不能只回退应用。验证只使用隔离的 PostgreSQL 恢复副本，不触碰当前稳定 M2 共享数据库。
+* Secret 展示：首次成功创建响应可返回一次原始 Secret；数据库、日志、列表、详情、更新、删除、Admin 接口及幂等响应存储均不得持久化或重放它。用户关闭弹窗后不能恢复，只能新建或轮换。
+
+### 上游与迁移号复核
+
+* 2026-09-14 已重新复核：`upstream/main` 为 `bdb42e22f81fcb633ff0a060961211dd2bcb515b`，固定审计基线落后 399 个提交。本任务继续在已验收固定基线上开发，不静默同步。
+* 当前 upstream migration 最大编号为 238，本分支最大编号为 242，因此本子任务使用 243；已发布的 239 至 242 不修改。
+
+### 计划测试
+
+* HMAC：确定性向量、版本/配置校验、active/previous/cutoff、previous 命中渐进升级和并发竞争。
+* Migration/真实 PostgreSQL：存量明文 backfill 后归零、摘要唯一性与格式约束、历史删除审计清理、重复启动和旧版本撤销；使用隔离恢复副本验证，不升级共享稳定库。
+* Repository/cache：所有查询改为摘要，缓存键和缓存快照不含原始 Key；创建、更新、删除、配额写入和 Group/User 批量失效覆盖摘要路径。
+* HTTP/Frontend：仅首次创建响应含 Secret；列表、详情和幂等重放只含遮罩元数据；创建弹窗警示不可恢复且支持一次复制，页面不再从列表复制完整 Key。
+* 回归：Ent/Wire generate、完整 Backend、Frontend lint/typecheck/Vitest/build、PostgreSQL integration、候选镜像黑盒、稳定实例健康和 `git diff --check`。
+
+## 22. 2026-09-20 / M6.4 完成：API Key HMAC 摘要与一次性 Secret
+
+### 完成任务
+
+* 新增域分离 HMAC-SHA256 Keyring，强制至少 32 字节 Pepper，支持一个 active 与一个 previous 版本、明确接受截止时间、previous 命中渐进重算和窗口结束后撤销未迁移旧 Key。
+* 新增 forward-only migration `243_api_key_hmac.sql`、Ent 字段与启动 backfill：活动 Key 只保留 64 位小写 HMAC 摘要、版本、前缀和末四位；删除审计与 `api_keys.key` 明文清空，认证缓存失效触发器直接写摘要。
+* Repository、Service、认证中间件、配额与 Group/User 批量失效统一改为摘要查询和摘要缓存键；缓存快照版本由 22 升到 23。
+* 仅首次创建响应携带瞬时 Secret；列表、详情、Admin 选择器和幂等重放只返回遮罩元数据。幂等存储在提交前移除 `key`，Frontend 一次展示弹窗禁止误关闭，批量图片功能只能使用用户当次粘贴、仅存内存的 Secret。
+* Compose、示例配置和部署脚本加入 HMAC Pepper 配置与生成；日志脱敏覆盖 `api_key` 和 `custom_key`，部署脚本不打印 Pepper。
+
+### 数据库与回滚
+
+* Migration 243 已在临时 PostgreSQL 16 上执行真实 migration 测试；存量明文 backfill、摘要格式、版本、约束与重复启动均通过。
+* 该 migration 仍按 forward-only 管理。由于明文被清除，回滚必须恢复升级前数据库备份并配套旧镜像，不能只回退应用。
+* 稳定 M2 数据库没有执行 migration 243，稳定镜像仍为 `sub2api:m2-scope-closure`。
+
+### 测试与候选镜像
+
+| 验证 | 结果 |
+| --- | --- |
+| Backend 全套 | `go test ./... -count=1` 全部通过 |
+| Middleware unit | `go test -tags unit ./internal/server/middleware -count=1` 通过 |
+| Repository integration | `go test -tags integration ./internal/repository -count=1` 通过 |
+| 真实 migration | `TestAPIKeyCredentialMigrationOnPostgreSQL` 通过 |
+| Frontend | 252 个测试文件、1844 项测试通过；ESLint、`vue-tsc -b`、`vue-tsc --noEmit` 与 Vite production build 通过 |
+| 候选镜像 | `sub2api:m6.4-api-key-hmac`，digest `sha256:9bdb9fcec7b0a645c5b2b039893876ca94d7bc534e91e8f8a07b93b076395180` |
+| 静态检查 | `git diff --check` 通过，仅有现存 CRLF 提示 |
+
+### 隔离黑盒结果
+
+* 首次创建 HTTP 200 且只在该响应返回精确 Secret；`masked_key` 前后缀正确。
+* 列表、详情和幂等重放均不包含 Secret 或 `key` 属性，重放头为 `X-Idempotency-Replayed: true`。
+* 使用新 Key 请求 `/v1/models` 先通过认证，再因未分配 Group 返回 403，证明摘要认证成功且授权边界继续生效。
+* PostgreSQL 实查确认 `api_keys.key=''`、摘要为 64 位小写十六进制、版本为 1、前缀和末四位正确；`idempotency_records.response_body` 不含 Secret 或 `key` 属性。
+* 候选应用在同一数据库重启后，列表、重放和认证结果保持一致。遗漏 active Pepper 的独立容器以 exit code 1 失败关闭，日志明确指向 HMAC/Pepper，且 API Key 行数不变。
+* Windows Docker Desktop 的三个陈旧 AF_UNIX 运行时 Socket 已精确清理；未恢复出厂、未删除镜像或卷。隔离 app/PostgreSQL/Redis 与 network 验收后已移除，稳定 M2 三容器恢复 healthy，仍只映射 `127.0.0.1:8080`。
+
+### 产品路线确认与下一步
+
+* V1 不做用户自助充值或外部自动充值，M8 改为 `deferred`。余额只能通过 M6.2 已有的管理员充值、正负调账和退款事务修改，禁止直接编辑 `users.balance`。
+* 共享账号池采用“本地用户/API Key 独立、余额与账单独立、多个用户共享同一个目标 Group 上游账号池”。Token、usage、账单和退款始终归属认证用户与 API Key；用户之间不可见。
+* M6 下一顺序项为 M6.5 上游账号凭据加密；之后完成对账告警与 M6.7 精确目标 Group 路由，并在 M6.7/M7 动态价格中加入两用户共享同一 Group、独立结算且并发不串账的验收用例。
+
+## 23. 后续记录模板
 
 每次工作结束追加一节，不覆盖历史记录。
 

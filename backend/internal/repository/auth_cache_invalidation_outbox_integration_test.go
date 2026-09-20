@@ -4,8 +4,6 @@ package repository
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"testing"
 	"time"
@@ -27,10 +25,9 @@ func TestAuthCacheInvalidationTriggers_CoverSecurityMutationsOnly(t *testing.T) 
 	keyValue := fmt.Sprintf("sk-auth-outbox-%d", suffix)
 	apiKeyRepo := NewAPIKeyRepository(integrationEntClient, integrationDB)
 	key := &service.APIKey{UserID: user.ID, GroupID: &groupID, Key: keyValue, Name: "outbox", Status: service.StatusActive}
-	require.NoError(t, apiKeyRepo.Create(ctx, key))
+	require.NoError(t, apiKeyRepo.Create(ctx, withTestAPIKeyCredential(key)))
 
-	sum := sha256.Sum256([]byte(keyValue))
-	cacheKey := hex.EncodeToString(sum[:])
+	cacheKey := key.KeyHash
 	clear := func() {
 		_, err := integrationDB.ExecContext(ctx, "DELETE FROM auth_cache_invalidation_outbox WHERE cache_key = $1", cacheKey)
 		require.NoError(t, err)
@@ -115,7 +112,7 @@ func TestAuthCacheInvalidationTriggers_CoverSecurityMutationsOnly(t *testing.T) 
 	clear()
 
 	require.NoError(t, apiKeyRepo.DeleteWithAudit(ctx, key.ID))
-	require.Equal(t, 1, count(), "tombstone delete must hash OLD.key exactly once")
+	require.Equal(t, 1, count(), "tombstone delete must enqueue OLD.key_hash exactly once")
 	var stored string
 	require.NoError(t, integrationDB.QueryRowContext(ctx,
 		"SELECT cache_key FROM auth_cache_invalidation_outbox WHERE cache_key = $1 LIMIT 1", cacheKey).Scan(&stored))

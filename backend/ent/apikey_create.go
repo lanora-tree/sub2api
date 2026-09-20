@@ -79,6 +79,70 @@ func (_c *APIKeyCreate) SetKey(v string) *APIKeyCreate {
 	return _c
 }
 
+// SetNillableKey sets the "key" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableKey(v *string) *APIKeyCreate {
+	if v != nil {
+		_c.SetKey(*v)
+	}
+	return _c
+}
+
+// SetKeyHash sets the "key_hash" field.
+func (_c *APIKeyCreate) SetKeyHash(v string) *APIKeyCreate {
+	_c.mutation.SetKeyHash(v)
+	return _c
+}
+
+// SetNillableKeyHash sets the "key_hash" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableKeyHash(v *string) *APIKeyCreate {
+	if v != nil {
+		_c.SetKeyHash(*v)
+	}
+	return _c
+}
+
+// SetKeyPrefix sets the "key_prefix" field.
+func (_c *APIKeyCreate) SetKeyPrefix(v string) *APIKeyCreate {
+	_c.mutation.SetKeyPrefix(v)
+	return _c
+}
+
+// SetNillableKeyPrefix sets the "key_prefix" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableKeyPrefix(v *string) *APIKeyCreate {
+	if v != nil {
+		_c.SetKeyPrefix(*v)
+	}
+	return _c
+}
+
+// SetKeyLastFour sets the "key_last_four" field.
+func (_c *APIKeyCreate) SetKeyLastFour(v string) *APIKeyCreate {
+	_c.mutation.SetKeyLastFour(v)
+	return _c
+}
+
+// SetNillableKeyLastFour sets the "key_last_four" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableKeyLastFour(v *string) *APIKeyCreate {
+	if v != nil {
+		_c.SetKeyLastFour(*v)
+	}
+	return _c
+}
+
+// SetKeyVersion sets the "key_version" field.
+func (_c *APIKeyCreate) SetKeyVersion(v int) *APIKeyCreate {
+	_c.mutation.SetKeyVersion(v)
+	return _c
+}
+
+// SetNillableKeyVersion sets the "key_version" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableKeyVersion(v *int) *APIKeyCreate {
+	if v != nil {
+		_c.SetKeyVersion(*v)
+	}
+	return _c
+}
+
 // SetName sets the "name" field.
 func (_c *APIKeyCreate) SetName(v string) *APIKeyCreate {
 	_c.mutation.SetName(v)
@@ -383,6 +447,26 @@ func (_c *APIKeyCreate) defaults() error {
 		v := apikey.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
 	}
+	if _, ok := _c.mutation.Key(); !ok {
+		v := apikey.DefaultKey
+		_c.mutation.SetKey(v)
+	}
+	if _, ok := _c.mutation.KeyHash(); !ok {
+		v := apikey.DefaultKeyHash
+		_c.mutation.SetKeyHash(v)
+	}
+	if _, ok := _c.mutation.KeyPrefix(); !ok {
+		v := apikey.DefaultKeyPrefix
+		_c.mutation.SetKeyPrefix(v)
+	}
+	if _, ok := _c.mutation.KeyLastFour(); !ok {
+		v := apikey.DefaultKeyLastFour
+		_c.mutation.SetKeyLastFour(v)
+	}
+	if _, ok := _c.mutation.KeyVersion(); !ok {
+		v := apikey.DefaultKeyVersion
+		_c.mutation.SetKeyVersion(v)
+	}
 	if _, ok := _c.mutation.Status(); !ok {
 		v := apikey.DefaultStatus
 		_c.mutation.SetStatus(v)
@@ -440,6 +524,33 @@ func (_c *APIKeyCreate) check() error {
 		if err := apikey.KeyValidator(v); err != nil {
 			return &ValidationError{Name: "key", err: fmt.Errorf(`ent: validator failed for field "APIKey.key": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.KeyHash(); !ok {
+		return &ValidationError{Name: "key_hash", err: errors.New(`ent: missing required field "APIKey.key_hash"`)}
+	}
+	if v, ok := _c.mutation.KeyHash(); ok {
+		if err := apikey.KeyHashValidator(v); err != nil {
+			return &ValidationError{Name: "key_hash", err: fmt.Errorf(`ent: validator failed for field "APIKey.key_hash": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.KeyPrefix(); !ok {
+		return &ValidationError{Name: "key_prefix", err: errors.New(`ent: missing required field "APIKey.key_prefix"`)}
+	}
+	if v, ok := _c.mutation.KeyPrefix(); ok {
+		if err := apikey.KeyPrefixValidator(v); err != nil {
+			return &ValidationError{Name: "key_prefix", err: fmt.Errorf(`ent: validator failed for field "APIKey.key_prefix": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.KeyLastFour(); !ok {
+		return &ValidationError{Name: "key_last_four", err: errors.New(`ent: missing required field "APIKey.key_last_four"`)}
+	}
+	if v, ok := _c.mutation.KeyLastFour(); ok {
+		if err := apikey.KeyLastFourValidator(v); err != nil {
+			return &ValidationError{Name: "key_last_four", err: fmt.Errorf(`ent: validator failed for field "APIKey.key_last_four": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.KeyVersion(); !ok {
+		return &ValidationError{Name: "key_version", err: errors.New(`ent: missing required field "APIKey.key_version"`)}
 	}
 	if _, ok := _c.mutation.Name(); !ok {
 		return &ValidationError{Name: "name", err: errors.New(`ent: missing required field "APIKey.name"`)}
@@ -526,6 +637,22 @@ func (_c *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Key(); ok {
 		_spec.SetField(apikey.FieldKey, field.TypeString, value)
 		_node.Key = value
+	}
+	if value, ok := _c.mutation.KeyHash(); ok {
+		_spec.SetField(apikey.FieldKeyHash, field.TypeString, value)
+		_node.KeyHash = value
+	}
+	if value, ok := _c.mutation.KeyPrefix(); ok {
+		_spec.SetField(apikey.FieldKeyPrefix, field.TypeString, value)
+		_node.KeyPrefix = value
+	}
+	if value, ok := _c.mutation.KeyLastFour(); ok {
+		_spec.SetField(apikey.FieldKeyLastFour, field.TypeString, value)
+		_node.KeyLastFour = value
+	}
+	if value, ok := _c.mutation.KeyVersion(); ok {
+		_spec.SetField(apikey.FieldKeyVersion, field.TypeInt, value)
+		_node.KeyVersion = value
 	}
 	if value, ok := _c.mutation.Name(); ok {
 		_spec.SetField(apikey.FieldName, field.TypeString, value)
@@ -748,6 +875,60 @@ func (u *APIKeyUpsert) SetKey(v string) *APIKeyUpsert {
 // UpdateKey sets the "key" field to the value that was provided on create.
 func (u *APIKeyUpsert) UpdateKey() *APIKeyUpsert {
 	u.SetExcluded(apikey.FieldKey)
+	return u
+}
+
+// SetKeyHash sets the "key_hash" field.
+func (u *APIKeyUpsert) SetKeyHash(v string) *APIKeyUpsert {
+	u.Set(apikey.FieldKeyHash, v)
+	return u
+}
+
+// UpdateKeyHash sets the "key_hash" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateKeyHash() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldKeyHash)
+	return u
+}
+
+// SetKeyPrefix sets the "key_prefix" field.
+func (u *APIKeyUpsert) SetKeyPrefix(v string) *APIKeyUpsert {
+	u.Set(apikey.FieldKeyPrefix, v)
+	return u
+}
+
+// UpdateKeyPrefix sets the "key_prefix" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateKeyPrefix() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldKeyPrefix)
+	return u
+}
+
+// SetKeyLastFour sets the "key_last_four" field.
+func (u *APIKeyUpsert) SetKeyLastFour(v string) *APIKeyUpsert {
+	u.Set(apikey.FieldKeyLastFour, v)
+	return u
+}
+
+// UpdateKeyLastFour sets the "key_last_four" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateKeyLastFour() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldKeyLastFour)
+	return u
+}
+
+// SetKeyVersion sets the "key_version" field.
+func (u *APIKeyUpsert) SetKeyVersion(v int) *APIKeyUpsert {
+	u.Set(apikey.FieldKeyVersion, v)
+	return u
+}
+
+// UpdateKeyVersion sets the "key_version" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateKeyVersion() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldKeyVersion)
+	return u
+}
+
+// AddKeyVersion adds v to the "key_version" field.
+func (u *APIKeyUpsert) AddKeyVersion(v int) *APIKeyUpsert {
+	u.Add(apikey.FieldKeyVersion, v)
 	return u
 }
 
@@ -1168,6 +1349,69 @@ func (u *APIKeyUpsertOne) SetKey(v string) *APIKeyUpsertOne {
 func (u *APIKeyUpsertOne) UpdateKey() *APIKeyUpsertOne {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.UpdateKey()
+	})
+}
+
+// SetKeyHash sets the "key_hash" field.
+func (u *APIKeyUpsertOne) SetKeyHash(v string) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetKeyHash(v)
+	})
+}
+
+// UpdateKeyHash sets the "key_hash" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateKeyHash() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateKeyHash()
+	})
+}
+
+// SetKeyPrefix sets the "key_prefix" field.
+func (u *APIKeyUpsertOne) SetKeyPrefix(v string) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetKeyPrefix(v)
+	})
+}
+
+// UpdateKeyPrefix sets the "key_prefix" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateKeyPrefix() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateKeyPrefix()
+	})
+}
+
+// SetKeyLastFour sets the "key_last_four" field.
+func (u *APIKeyUpsertOne) SetKeyLastFour(v string) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetKeyLastFour(v)
+	})
+}
+
+// UpdateKeyLastFour sets the "key_last_four" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateKeyLastFour() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateKeyLastFour()
+	})
+}
+
+// SetKeyVersion sets the "key_version" field.
+func (u *APIKeyUpsertOne) SetKeyVersion(v int) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetKeyVersion(v)
+	})
+}
+
+// AddKeyVersion adds v to the "key_version" field.
+func (u *APIKeyUpsertOne) AddKeyVersion(v int) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddKeyVersion(v)
+	})
+}
+
+// UpdateKeyVersion sets the "key_version" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateKeyVersion() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateKeyVersion()
 	})
 }
 
@@ -1806,6 +2050,69 @@ func (u *APIKeyUpsertBulk) SetKey(v string) *APIKeyUpsertBulk {
 func (u *APIKeyUpsertBulk) UpdateKey() *APIKeyUpsertBulk {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.UpdateKey()
+	})
+}
+
+// SetKeyHash sets the "key_hash" field.
+func (u *APIKeyUpsertBulk) SetKeyHash(v string) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetKeyHash(v)
+	})
+}
+
+// UpdateKeyHash sets the "key_hash" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateKeyHash() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateKeyHash()
+	})
+}
+
+// SetKeyPrefix sets the "key_prefix" field.
+func (u *APIKeyUpsertBulk) SetKeyPrefix(v string) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetKeyPrefix(v)
+	})
+}
+
+// UpdateKeyPrefix sets the "key_prefix" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateKeyPrefix() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateKeyPrefix()
+	})
+}
+
+// SetKeyLastFour sets the "key_last_four" field.
+func (u *APIKeyUpsertBulk) SetKeyLastFour(v string) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetKeyLastFour(v)
+	})
+}
+
+// UpdateKeyLastFour sets the "key_last_four" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateKeyLastFour() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateKeyLastFour()
+	})
+}
+
+// SetKeyVersion sets the "key_version" field.
+func (u *APIKeyUpsertBulk) SetKeyVersion(v int) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetKeyVersion(v)
+	})
+}
+
+// AddKeyVersion adds v to the "key_version" field.
+func (u *APIKeyUpsertBulk) AddKeyVersion(v int) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.AddKeyVersion(v)
+	})
+}
+
+// UpdateKeyVersion sets the "key_version" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateKeyVersion() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateKeyVersion()
 	})
 }
 

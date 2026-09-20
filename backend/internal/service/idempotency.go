@@ -87,6 +87,9 @@ type IdempotencyExecuteOptions struct {
 	Payload        any
 	TTL            time.Duration
 	RequireKey     bool
+	// StoredResponseTransform may remove one-time secrets before persistence.
+	// It does not change the response returned to the first successful caller.
+	StoredResponseTransform func(any) any
 }
 
 type IdempotencyExecuteResult struct {
@@ -417,7 +420,11 @@ func (c *IdempotencyCoordinator) Execute(
 		return nil, execErr
 	}
 
-	storedBody, marshalErr := c.marshalStoredResponse(data)
+	storedData := data
+	if opts.StoredResponseTransform != nil {
+		storedData = opts.StoredResponseTransform(data)
+	}
+	storedBody, marshalErr := c.marshalStoredResponse(storedData)
 	if marshalErr != nil {
 		RecordIdempotencyStoreUnavailable(opts.Route, opts.Scope, "marshal_response_error")
 		logIdempotencyAudit(opts.Route, opts.Scope, keyHash, "processing->store_unavailable", false, map[string]string{

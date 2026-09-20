@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/apikeyhmac"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
@@ -24,14 +25,15 @@ import (
 )
 
 var (
-	ErrAPIKeyNotFound       = infraerrors.NotFound("API_KEY_NOT_FOUND", "api key not found")
-	ErrGroupNotAllowed      = infraerrors.Forbidden("GROUP_NOT_ALLOWED", "user is not allowed to bind this group")
-	ErrAPIKeyExists         = infraerrors.Conflict("API_KEY_EXISTS", "api key already exists")
-	ErrAPIKeyTooShort       = infraerrors.BadRequest("API_KEY_TOO_SHORT", "api key must be at least 16 characters")
-	ErrAPIKeyInvalidChars   = infraerrors.BadRequest("API_KEY_INVALID_CHARS", "api key can only contain letters, numbers, underscores, and hyphens")
-	ErrAPIKeyRateLimited    = infraerrors.TooManyRequests("API_KEY_RATE_LIMITED", "too many failed attempts, please try again later")
-	ErrAPIKeyAuthOverloaded = infraerrors.ServiceUnavailable("API_KEY_AUTH_OVERLOADED", "api key authentication is temporarily overloaded")
-	ErrInvalidIPPattern     = infraerrors.BadRequest("INVALID_IP_PATTERN", "invalid IP or CIDR pattern")
+	ErrAPIKeyNotFound        = infraerrors.NotFound("API_KEY_NOT_FOUND", "api key not found")
+	ErrGroupNotAllowed       = infraerrors.Forbidden("GROUP_NOT_ALLOWED", "user is not allowed to bind this group")
+	ErrAPIKeyExists          = infraerrors.Conflict("API_KEY_EXISTS", "api key already exists")
+	ErrAPIKeyTooShort        = infraerrors.BadRequest("API_KEY_TOO_SHORT", "api key must be at least 16 characters")
+	ErrAPIKeyInvalidChars    = infraerrors.BadRequest("API_KEY_INVALID_CHARS", "api key can only contain letters, numbers, underscores, and hyphens")
+	ErrAPIKeyRateLimited     = infraerrors.TooManyRequests("API_KEY_RATE_LIMITED", "too many failed attempts, please try again later")
+	ErrAPIKeyAuthOverloaded  = infraerrors.ServiceUnavailable("API_KEY_AUTH_OVERLOADED", "api key authentication is temporarily overloaded")
+	ErrAPIKeyHMACUnavailable = infraerrors.ServiceUnavailable("API_KEY_HMAC_UNAVAILABLE", "api key authentication is unavailable")
+	ErrInvalidIPPattern      = infraerrors.BadRequest("INVALID_IP_PATTERN", "invalid IP or CIDR pattern")
 	// ErrAPIKeyExpired        = infraerrors.Forbidden("API_KEY_EXPIRED", "api key has expired")
 	ErrAPIKeyExpired = infraerrors.Forbidden("API_KEY_EXPIRED", "api key 已过期")
 	// ErrAPIKeyQuotaExhausted = infraerrors.TooManyRequests("API_KEY_QUOTA_EXHAUSTED", "api key quota exhausted")
@@ -85,11 +87,12 @@ func (f APIKeyUpdateFields) IsEmpty() bool {
 type APIKeyRepository interface {
 	Create(ctx context.Context, key *APIKey) error
 	GetByID(ctx context.Context, id int64) (*APIKey, error)
-	// GetKeyAndOwnerID 仅获取 API Key 的 key 与所有者 ID，用于删除等轻量场景
+	// GetKeyAndOwnerID 仅获取 API Key 的 HMAC 摘要与所有者 ID，用于删除等轻量场景。
+	// 保留旧方法名以缩小接口变更面，返回值绝不是明文。
 	GetKeyAndOwnerID(ctx context.Context, id int64) (string, int64, error)
-	GetByKey(ctx context.Context, key string) (*APIKey, error)
+	GetByKey(ctx context.Context, keyHash string) (*APIKey, error)
 	// GetByKeyForAuth 认证专用查询，返回最小字段集
-	GetByKeyForAuth(ctx context.Context, key string) (*APIKey, error)
+	GetByKeyForAuth(ctx context.Context, keyHash string) (*APIKey, error)
 	// Update 只写 fields 中显式声明的列，其余列保持库中当前值。
 	Update(ctx context.Context, key *APIKey, fields APIKeyUpdateFields) error
 	Delete(ctx context.Context, id int64) error
@@ -101,15 +104,15 @@ type APIKeyRepository interface {
 	ListByUserID(ctx context.Context, userID int64, params pagination.PaginationParams, filters APIKeyListFilters) ([]APIKey, *pagination.PaginationResult, error)
 	VerifyOwnership(ctx context.Context, userID int64, apiKeyIDs []int64) ([]int64, error)
 	CountByUserID(ctx context.Context, userID int64) (int64, error)
-	ExistsByKey(ctx context.Context, key string) (bool, error)
+	ExistsByKey(ctx context.Context, keyHash string) (bool, error)
 	ListByGroupID(ctx context.Context, groupID int64, params pagination.PaginationParams) ([]APIKey, *pagination.PaginationResult, error)
 	SearchAPIKeys(ctx context.Context, userID int64, keyword string, limit int) ([]APIKey, error)
 	ClearGroupIDByGroupID(ctx context.Context, groupID int64) (int64, error)
 	// UpdateGroupIDByUserAndGroup 将用户下绑定 oldGroupID 的所有 Key 迁移到 newGroupID
 	UpdateGroupIDByUserAndGroup(ctx context.Context, userID, oldGroupID, newGroupID int64) (int64, error)
 	CountByGroupID(ctx context.Context, groupID int64) (int64, error)
-	ListKeysByUserID(ctx context.Context, userID int64) ([]string, error)
-	ListKeysByGroupID(ctx context.Context, groupID int64) ([]string, error)
+	ListKeysByUserID(ctx context.Context, userID int64) ([]string, error)   // returns HMAC digests
+	ListKeysByGroupID(ctx context.Context, groupID int64) ([]string, error) // returns HMAC digests
 
 	// Quota methods
 	IncrementQuotaUsed(ctx context.Context, id int64, amount float64) (float64, error)
@@ -164,7 +167,7 @@ func (d *APIKeyRateLimitData) EffectiveUsage7d() float64 {
 type APIKeyQuotaUsageState struct {
 	QuotaUsed float64
 	Quota     float64
-	Key       string
+	KeyHash   string
 	Status    string
 }
 
@@ -205,6 +208,27 @@ type APIKeyAuthCacheInvalidator interface {
 	InvalidateAuthCacheByKey(ctx context.Context, key string)
 	InvalidateAuthCacheByUserID(ctx context.Context, userID int64)
 	InvalidateAuthCacheByGroupID(ctx context.Context, groupID int64)
+}
+
+type apiKeyAuthDigestCacheInvalidator interface {
+	InvalidateAuthCacheByDigest(ctx context.Context, keyHash string)
+}
+
+type apiKeyHashRotator interface {
+	RotateKeyHash(ctx context.Context, id int64, expectedHash, newHash string, newVersion int) (bool, error)
+}
+
+func invalidateAPIKeyAuthCacheByDigest(ctx context.Context, invalidator APIKeyAuthCacheInvalidator, keyHash string) {
+	if invalidator == nil || strings.TrimSpace(keyHash) == "" {
+		return
+	}
+	if digestInvalidator, ok := invalidator.(apiKeyAuthDigestCacheInvalidator); ok {
+		digestInvalidator.InvalidateAuthCacheByDigest(ctx, keyHash)
+		return
+	}
+	// Compatibility fallback for narrow test doubles and rolling integrations.
+	// The production APIKeyService always implements the digest-specific path.
+	invalidator.InvalidateAuthCacheByKey(ctx, keyHash)
 }
 
 // CreateAPIKeyRequest 创建API Key请求
@@ -292,6 +316,8 @@ type APIKeyService struct {
 	rateLimitCacheInvalid     RateLimitCacheInvalidator // optional: invalidate Redis rate limit cache
 	concurrencyService        *ConcurrencyService
 	cfg                       *config.Config
+	keyring                   *apikeyhmac.Keyring
+	keyringErr                error
 	authCacheL1               *ristretto.Cache
 	authNegativeCacheL1       *ristretto.Cache
 	authCfg                   apiKeyAuthCacheConfig
@@ -348,6 +374,11 @@ func NewAPIKeyService(
 		userGroupRateRepo: userGroupRateRepo,
 		cache:             cache,
 		cfg:               cfg,
+	}
+	if cfg == nil {
+		svc.keyringErr = fmt.Errorf("api key HMAC config is required")
+	} else {
+		svc.keyring, svc.keyringErr = cfg.APIKeyHMAC.Keyring()
 	}
 	svc.initAuthCache(cfg)
 	lookupConcurrency := defaultAuthLookupConcurrency
@@ -509,8 +540,9 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 			return nil, err
 		}
 
-		// 检查Key是否已存在
-		exists, err := s.apiKeyRepo.ExistsByKey(ctx, *req.CustomKey)
+		// 检查 active 与仍处于接受窗口的 previous 摘要，防止 Pepper
+		// 轮换期间重复使用同一个自定义 Secret。
+		exists, err := s.apiKeyExists(ctx, *req.CustomKey)
 		if err != nil {
 			return nil, fmt.Errorf("check key exists: %w", err)
 		}
@@ -545,6 +577,14 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		RateLimit1d: req.RateLimit1d,
 		RateLimit7d: req.RateLimit7d,
 	}
+	active, prefix, lastFour, err := s.activeKeyCredential(key)
+	if err != nil {
+		return nil, err
+	}
+	apiKey.KeyHash = active.Digest
+	apiKey.KeyVersion = active.Version
+	apiKey.KeyPrefix = prefix
+	apiKey.KeyLastFour = lastFour
 
 	// Set expiration time if specified
 	if req.ExpiresInDays != nil && *req.ExpiresInDays > 0 {
@@ -556,7 +596,7 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		return nil, fmt.Errorf("create api key: %w", err)
 	}
 
-	s.InvalidateAuthCacheByKey(ctx, apiKey.Key)
+	s.InvalidateAuthCacheByDigest(ctx, apiKey.KeyHash)
 	s.compileAPIKeyIPRules(apiKey)
 
 	return apiKey, nil
@@ -705,6 +745,9 @@ func (s *APIKeyService) GetByKey(ctx context.Context, key string) (*APIKey, erro
 	if len(key) == 0 || len(key) > MaxAPIKeyCredentialBytes {
 		return nil, ErrAPIKeyNotFound
 	}
+	if _, err := s.requireKeyring(); err != nil {
+		return nil, err
+	}
 	cacheKey := s.authCacheKey(key)
 
 	if entry, ok := s.getAuthCacheEntry(ctx, cacheKey); ok {
@@ -746,7 +789,7 @@ func (s *APIKeyService) GetByKey(ctx context.Context, key string) (*APIKey, erro
 		}
 	}
 
-	apiKey, err := s.lookupAPIKeyForAuth(ctx, key)
+	apiKey, err := s.lookupAPIKeyByRawCredential(ctx, key)
 	if err != nil {
 		return nil, fmt.Errorf("get api key: %w", err)
 	}
@@ -902,7 +945,7 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 		return nil, fmt.Errorf("update api key: %w", err)
 	}
 
-	s.InvalidateAuthCacheByKey(ctx, apiKey.Key)
+	s.InvalidateAuthCacheByDigest(ctx, apiKey.KeyHash)
 	s.compileAPIKeyIPRules(apiKey)
 
 	// Invalidate Redis rate limit cache so reset takes effect immediately
@@ -915,7 +958,7 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 
 // Delete 删除API Key
 func (s *APIKeyService) Delete(ctx context.Context, id int64, userID int64) error {
-	key, ownerID, err := s.apiKeyRepo.GetKeyAndOwnerID(ctx, id)
+	keyHash, ownerID, err := s.apiKeyRepo.GetKeyAndOwnerID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("get api key: %w", err)
 	}
@@ -934,7 +977,7 @@ func (s *APIKeyService) Delete(ctx context.Context, id int64, userID int64) erro
 	if s.cache != nil {
 		_ = s.cache.DeleteCreateAttemptCount(ctx, userID)
 	}
-	s.InvalidateAuthCacheByKey(ctx, key)
+	s.InvalidateAuthCacheByDigest(ctx, keyHash)
 	s.lastUsedTouchL1.Delete(id)
 
 	return nil
@@ -1133,8 +1176,8 @@ func (s *APIKeyService) UpdateQuotaUsed(ctx context.Context, apiKeyID int64, cos
 		if err != nil {
 			return fmt.Errorf("increment quota used: %w", err)
 		}
-		if state != nil && state.Status == StatusAPIKeyQuotaExhausted && strings.TrimSpace(state.Key) != "" {
-			s.InvalidateAuthCacheByKey(ctx, state.Key)
+		if state != nil && state.Status == StatusAPIKeyQuotaExhausted && strings.TrimSpace(state.KeyHash) != "" {
+			s.InvalidateAuthCacheByDigest(ctx, state.KeyHash)
 		}
 		return nil
 	}
@@ -1160,7 +1203,7 @@ func (s *APIKeyService) UpdateQuotaUsed(ctx context.Context, apiKeyID int64, cos
 			return nil // Don't fail the request
 		}
 		// Invalidate cache so next request sees the new status
-		s.InvalidateAuthCacheByKey(ctx, apiKey.Key)
+		s.InvalidateAuthCacheByDigest(ctx, apiKey.KeyHash)
 	}
 
 	return nil

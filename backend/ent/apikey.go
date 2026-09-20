@@ -28,8 +28,16 @@ type APIKey struct {
 	DeletedAt *time.Time `json:"deleted_at,omitempty"`
 	// UserID holds the value of the "user_id" field.
 	UserID int64 `json:"user_id,omitempty"`
-	// Key holds the value of the "key" field.
-	Key string `json:"key,omitempty"`
+	// Deprecated plaintext credential column; must remain empty
+	Key string `json:"-"`
+	// Lowercase HMAC-SHA256 digest of the credential
+	KeyHash string `json:"-"`
+	// Non-secret display prefix
+	KeyPrefix string `json:"key_prefix,omitempty"`
+	// Non-secret final four characters
+	KeyLastFour string `json:"key_last_four,omitempty"`
+	// HMAC Pepper version used for key_hash
+	KeyVersion int `json:"key_version,omitempty"`
 	// Name holds the value of the "name" field.
 	Name string `json:"name,omitempty"`
 	// GroupID holds the value of the "group_id" field.
@@ -125,9 +133,9 @@ func (*APIKey) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case apikey.FieldQuota, apikey.FieldQuotaUsed, apikey.FieldRateLimit5h, apikey.FieldRateLimit1d, apikey.FieldRateLimit7d, apikey.FieldUsage5h, apikey.FieldUsage1d, apikey.FieldUsage7d:
 			values[i] = new(sql.NullFloat64)
-		case apikey.FieldID, apikey.FieldUserID, apikey.FieldGroupID:
+		case apikey.FieldID, apikey.FieldUserID, apikey.FieldKeyVersion, apikey.FieldGroupID:
 			values[i] = new(sql.NullInt64)
-		case apikey.FieldKey, apikey.FieldName, apikey.FieldStatus:
+		case apikey.FieldKey, apikey.FieldKeyHash, apikey.FieldKeyPrefix, apikey.FieldKeyLastFour, apikey.FieldName, apikey.FieldStatus:
 			values[i] = new(sql.NullString)
 		case apikey.FieldCreatedAt, apikey.FieldUpdatedAt, apikey.FieldDeletedAt, apikey.FieldLastUsedAt, apikey.FieldExpiresAt, apikey.FieldWindow5hStart, apikey.FieldWindow1dStart, apikey.FieldWindow7dStart:
 			values[i] = new(sql.NullTime)
@@ -182,6 +190,30 @@ func (_m *APIKey) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field key", values[i])
 			} else if value.Valid {
 				_m.Key = value.String
+			}
+		case apikey.FieldKeyHash:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field key_hash", values[i])
+			} else if value.Valid {
+				_m.KeyHash = value.String
+			}
+		case apikey.FieldKeyPrefix:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field key_prefix", values[i])
+			} else if value.Valid {
+				_m.KeyPrefix = value.String
+			}
+		case apikey.FieldKeyLastFour:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field key_last_four", values[i])
+			} else if value.Valid {
+				_m.KeyLastFour = value.String
+			}
+		case apikey.FieldKeyVersion:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field key_version", values[i])
+			} else if value.Valid {
+				_m.KeyVersion = int(value.Int64)
 			}
 		case apikey.FieldName:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -366,8 +398,18 @@ func (_m *APIKey) String() string {
 	builder.WriteString("user_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.UserID))
 	builder.WriteString(", ")
-	builder.WriteString("key=")
-	builder.WriteString(_m.Key)
+	builder.WriteString("key=<sensitive>")
+	builder.WriteString(", ")
+	builder.WriteString("key_hash=<sensitive>")
+	builder.WriteString(", ")
+	builder.WriteString("key_prefix=")
+	builder.WriteString(_m.KeyPrefix)
+	builder.WriteString(", ")
+	builder.WriteString("key_last_four=")
+	builder.WriteString(_m.KeyLastFour)
+	builder.WriteString(", ")
+	builder.WriteString("key_version=")
+	builder.WriteString(fmt.Sprintf("%v", _m.KeyVersion))
 	builder.WriteString(", ")
 	builder.WriteString("name=")
 	builder.WriteString(_m.Name)

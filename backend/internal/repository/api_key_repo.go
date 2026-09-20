@@ -15,6 +15,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/schema/mixins"
 	"github.com/Wei-Shaw/sub2api/ent/user"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/apikeyhmac"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/lib/pq"
 
@@ -43,9 +44,16 @@ func (r *apiKeyRepository) activeQuery() *dbent.APIKeyQuery {
 }
 
 func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) error {
+	if err := validateAPIKeyCredential(key); err != nil {
+		return err
+	}
 	builder := r.client.APIKey.Create().
 		SetUserID(key.UserID).
-		SetKey(key.Key).
+		SetKey("").
+		SetKeyHash(key.KeyHash).
+		SetKeyPrefix(key.KeyPrefix).
+		SetKeyLastFour(key.KeyLastFour).
+		SetKeyVersion(key.KeyVersion).
 		SetName(key.Name).
 		SetStatus(key.Status).
 		SetNillableGroupID(key.GroupID).
@@ -74,6 +82,25 @@ func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) erro
 	return translatePersistenceError(err, nil, service.ErrAPIKeyExists)
 }
 
+func validateAPIKeyCredential(key *service.APIKey) error {
+	if key == nil {
+		return fmt.Errorf("create api key: credential is required")
+	}
+	if !apikeyhmac.IsDigest(key.KeyHash) {
+		return fmt.Errorf("create api key: valid HMAC digest is required")
+	}
+	if key.KeyVersion <= 0 {
+		return fmt.Errorf("create api key: positive HMAC version is required")
+	}
+	if key.KeyPrefix == "" || len(key.KeyPrefix) > 32 {
+		return fmt.Errorf("create api key: bounded display prefix is required")
+	}
+	if len(key.KeyLastFour) != 4 {
+		return fmt.Errorf("create api key: four-character display suffix is required")
+	}
+	return nil
+}
+
 func (r *apiKeyRepository) GetByID(ctx context.Context, id int64) (*service.APIKey, error) {
 	m, err := r.activeQuery().
 		Where(apikey.IDEQ(id)).
@@ -89,7 +116,7 @@ func (r *apiKeyRepository) GetByID(ctx context.Context, id int64) (*service.APIK
 	return apiKeyEntityToService(m), nil
 }
 
-// GetKeyAndOwnerID 根据 API Key ID 获取其 key 与所有者（用户）ID。
+// GetKeyAndOwnerID 根据 API Key ID 获取其 HMAC 摘要与所有者（用户）ID。
 // 相比 GetByID，此方法性能更优，因为：
 //   - 使用 Select() 只查询必要字段，减少数据传输量
 //   - 不加载完整的 API Key 实体及其关联数据（User、Group 等）
@@ -97,7 +124,7 @@ func (r *apiKeyRepository) GetByID(ctx context.Context, id int64) (*service.APIK
 func (r *apiKeyRepository) GetKeyAndOwnerID(ctx context.Context, id int64) (string, int64, error) {
 	m, err := r.activeQuery().
 		Where(apikey.IDEQ(id)).
-		Select(apikey.FieldKey, apikey.FieldUserID).
+		Select(apikey.FieldKeyHash, apikey.FieldUserID).
 		Only(ctx)
 	if err != nil {
 		if dbent.IsNotFound(err) {
@@ -105,12 +132,12 @@ func (r *apiKeyRepository) GetKeyAndOwnerID(ctx context.Context, id int64) (stri
 		}
 		return "", 0, err
 	}
-	return m.Key, m.UserID, nil
+	return m.KeyHash, m.UserID, nil
 }
 
-func (r *apiKeyRepository) GetByKey(ctx context.Context, key string) (*service.APIKey, error) {
+func (r *apiKeyRepository) GetByKey(ctx context.Context, keyHash string) (*service.APIKey, error) {
 	m, err := r.activeQuery().
-		Where(apikey.KeyEQ(key)).
+		Where(apikey.KeyHashEQ(keyHash)).
 		WithUser(func(q *dbent.UserQuery) {
 			q.WithAllowedGroups(func(gq *dbent.GroupQuery) {
 				gq.Select(group.FieldID)
@@ -127,12 +154,16 @@ func (r *apiKeyRepository) GetByKey(ctx context.Context, key string) (*service.A
 	return apiKeyEntityToService(m), nil
 }
 
-func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*service.APIKey, error) {
+func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, keyHash string) (*service.APIKey, error) {
 	m, err := r.activeQuery().
-		Where(apikey.KeyEQ(key)).
+		Where(apikey.KeyHashEQ(keyHash)).
 		Select(
 			apikey.FieldID,
 			apikey.FieldUserID,
+			apikey.FieldKeyHash,
+			apikey.FieldKeyPrefix,
+			apikey.FieldKeyLastFour,
+			apikey.FieldKeyVersion,
 			apikey.FieldGroupID,
 			apikey.FieldName,
 			apikey.FieldStatus,
@@ -241,6 +272,25 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 	return apiKeyEntityToService(m), nil
 }
 
+// RotateKeyHash atomically upgrades one previous-version digest to the active
+// version. A false result means another request already changed or deleted it.
+func (r *apiKeyRepository) RotateKeyHash(ctx context.Context, id int64, expectedHash, newHash string, newVersion int) (bool, error) {
+	affected, err := r.client.APIKey.Update().
+		Where(
+			apikey.IDEQ(id),
+			apikey.DeletedAtIsNil(),
+			apikey.KeyHashEQ(expectedHash),
+		).
+		SetKeyHash(newHash).
+		SetKeyVersion(newVersion).
+		SetUpdatedAt(time.Now()).
+		Save(ctx)
+	if err != nil {
+		return false, translatePersistenceError(err, nil, service.ErrAPIKeyExists)
+	}
+	return affected == 1, nil
+}
+
 func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey, fields service.APIKeyUpdateFields) error {
 	// 空掩码代表调用方不改任何列，直接返回，避免产生一次无意义的整行写。
 	if fields.IsEmpty() {
@@ -344,12 +394,12 @@ func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey, fiel
 }
 
 func (r *apiKeyRepository) Delete(ctx context.Context, id int64) error {
-	// 存在唯一键约束 生成tombstone key 用来释放原key，长度远小于 128，满足 schema 限制
-	tombstoneKey := fmt.Sprintf("__deleted__%d__%d", id, time.Now().UnixNano())
 	// 显式软删除：避免依赖 Hook 行为，确保 deleted_at 一定被设置。
 	affected, err := r.client.APIKey.Update().
 		Where(apikey.IDEQ(id), apikey.DeletedAtIsNil()).
-		SetKey(tombstoneKey).
+		SetKey("").
+		SetKeyHash("").
+		SetKeyVersion(0).
 		SetDeletedAt(time.Now()).
 		Save(ctx)
 	if err != nil {
@@ -374,13 +424,12 @@ func (r *apiKeyRepository) Delete(ctx context.Context, id int64) error {
 }
 
 // DeleteWithAudit keeps the legacy method name for rolling-upgrade compatibility.
-// It atomically tombstones and soft-deletes the key without retaining credential
-// material. Tombstoning releases the unique key value for safe reuse.
+// It atomically clears the digest and soft-deletes the key without retaining
+// credential material. Clearing the partial-unique digest releases the Secret
+// for safe reuse.
 func (r *apiKeyRepository) DeleteWithAudit(ctx context.Context, id int64) error {
-	tombstoneKey := fmt.Sprintf("__deleted__%d__%d", id, time.Now().UnixNano())
-
 	if existingTx := dbent.TxFromContext(ctx); existingTx != nil {
-		return r.deleteWithTombstone(ctx, existingTx.Client(), id, tombstoneKey)
+		return r.deleteCredential(ctx, existingTx.Client(), id)
 	}
 
 	tx, err := r.client.Tx(ctx)
@@ -393,7 +442,7 @@ func (r *apiKeyRepository) DeleteWithAudit(ctx context.Context, id int64) error 
 		exec = tx.Client()
 	}
 
-	if err := r.deleteWithTombstone(ctx, exec, id, tombstoneKey); err != nil {
+	if err := r.deleteCredential(ctx, exec, id); err != nil {
 		return err
 	}
 
@@ -403,11 +452,12 @@ func (r *apiKeyRepository) DeleteWithAudit(ctx context.Context, id int64) error 
 	return nil
 }
 
-func (r *apiKeyRepository) deleteWithTombstone(ctx context.Context, exec *dbent.Client, id int64, tombstoneKey string) error {
+func (r *apiKeyRepository) deleteCredential(ctx context.Context, exec *dbent.Client, id int64) error {
 	res, err := exec.ExecContext(ctx, `
 		UPDATE api_keys
-		SET key = $1, deleted_at = NOW(), updated_at = NOW()
-		WHERE id = $2 AND deleted_at IS NULL`, tombstoneKey, id)
+		SET key = '', key_hash = '', key_version = 0,
+			deleted_at = NOW(), updated_at = NOW()
+		WHERE id = $1 AND deleted_at IS NULL`, id)
 	if err != nil {
 		return err
 	}
@@ -437,7 +487,8 @@ func (r *apiKeyRepository) apiKeyListByUserIDQuery(userID int64, filters service
 	if filters.Search != "" {
 		q = q.Where(apikey.Or(
 			apikey.NameContainsFold(filters.Search),
-			apikey.KeyContainsFold(filters.Search),
+			apikey.KeyPrefixContainsFold(filters.Search),
+			apikey.KeyLastFourContainsFold(filters.Search),
 		))
 	}
 	if filters.Status != "" {
@@ -613,8 +664,8 @@ func (r *apiKeyRepository) CountByUserID(ctx context.Context, userID int64) (int
 	return int64(count), err
 }
 
-func (r *apiKeyRepository) ExistsByKey(ctx context.Context, key string) (bool, error) {
-	count, err := r.activeQuery().Where(apikey.KeyEQ(key)).Count(ctx)
+func (r *apiKeyRepository) ExistsByKey(ctx context.Context, keyHash string) (bool, error) {
+	count, err := r.activeQuery().Where(apikey.KeyHashEQ(keyHash)).Count(ctx)
 	return count > 0, err
 }
 
@@ -734,7 +785,7 @@ func (r *apiKeyRepository) CountByGroupID(ctx context.Context, groupID int64) (i
 func (r *apiKeyRepository) ListKeysByUserID(ctx context.Context, userID int64) ([]string, error) {
 	keys, err := r.activeQuery().
 		Where(apikey.UserIDEQ(userID)).
-		Select(apikey.FieldKey).
+		Select(apikey.FieldKeyHash).
 		Strings(ctx)
 	if err != nil {
 		return nil, err
@@ -745,7 +796,7 @@ func (r *apiKeyRepository) ListKeysByUserID(ctx context.Context, userID int64) (
 func (r *apiKeyRepository) ListKeysByGroupID(ctx context.Context, groupID int64) ([]string, error) {
 	keys, err := r.activeQuery().
 		Where(apikey.GroupIDEQ(groupID)).
-		Select(apikey.FieldKey).
+		Select(apikey.FieldKeyHash).
 		Strings(ctx)
 	if err != nil {
 		return nil, err
@@ -781,11 +832,11 @@ func (r *apiKeyRepository) IncrementQuotaUsedAndGetState(ctx context.Context, id
 			END,
 			updated_at = NOW()
 		WHERE id = $3 AND deleted_at IS NULL
-		RETURNING quota_used, quota, key, status
+		RETURNING quota_used, quota, key_hash, status
 	`
 
 	state := &service.APIKeyQuotaUsageState{}
-	if err := scanSingleRow(ctx, r.sql, query, []any{amount, service.StatusAPIKeyQuotaExhausted, id}, &state.QuotaUsed, &state.Quota, &state.Key, &state.Status); err != nil {
+	if err := scanSingleRow(ctx, r.sql, query, []any{amount, service.StatusAPIKeyQuotaExhausted, id}, &state.QuotaUsed, &state.Quota, &state.KeyHash, &state.Status); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, service.ErrAPIKeyNotFound
 		}
@@ -874,7 +925,10 @@ func apiKeyEntityToService(m *dbent.APIKey) *service.APIKey {
 	out := &service.APIKey{
 		ID:            m.ID,
 		UserID:        m.UserID,
-		Key:           m.Key,
+		KeyHash:       m.KeyHash,
+		KeyPrefix:     m.KeyPrefix,
+		KeyLastFour:   m.KeyLastFour,
+		KeyVersion:    m.KeyVersion,
 		Name:          m.Name,
 		Status:        m.Status,
 		IPWhitelist:   m.IPWhitelist,

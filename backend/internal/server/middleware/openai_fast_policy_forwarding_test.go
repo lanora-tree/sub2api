@@ -52,7 +52,7 @@ func TestAPIKeyAuthForwardsUserScopedOpenAIFastPolicyToUpstream(t *testing.T) {
 	settingsJSON, err := json.Marshal(settings)
 	require.NoError(t, err)
 
-	cfg := &config.Config{RunMode: config.RunModeSimple}
+	cfg := testAPIKeyConfig(&config.Config{RunMode: config.RunModeSimple})
 	cfg.Security.URLAllowlist.Enabled = false
 	cfg.Security.URLAllowlist.AllowInsecureHTTP = true
 
@@ -74,8 +74,8 @@ func TestAPIKeyAuthForwardsUserScopedOpenAIFastPolicyToUpstream(t *testing.T) {
 		Hydrated: true,
 	}
 	apiKeys := map[string]*service.APIKey{
-		"key-user-42": newOpenAIFastPolicyForwardingAPIKey(1, "key-user-42", 42, groupID, group),
-		"key-user-43": newOpenAIFastPolicyForwardingAPIKey(2, "key-user-43", 43, groupID, group),
+		testAPIKeyDigest("key-user-42"): newOpenAIFastPolicyForwardingAPIKey(1, "key-user-42", 42, groupID, group),
+		testAPIKeyDigest("key-user-43"): newOpenAIFastPolicyForwardingAPIKey(2, "key-user-43", 43, groupID, group),
 	}
 	apiKeyService := service.NewAPIKeyService(&openAIFastPolicyForwardingAPIKeyRepo{apiKeys: apiKeys}, nil, nil, nil, nil, nil, cfg)
 	account := &service.Account{

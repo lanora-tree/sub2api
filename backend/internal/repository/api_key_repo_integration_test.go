@@ -45,13 +45,14 @@ func (s *APIKeyRepoSuite) TestCreate() {
 		Status: service.StatusActive,
 	}
 
-	err := s.repo.Create(s.ctx, key)
+	err := s.repo.Create(s.ctx, withTestAPIKeyCredential(key))
 	s.Require().NoError(err, "Create")
 	s.Require().NotZero(key.ID, "expected ID to be set")
 
 	got, err := s.repo.GetByID(s.ctx, key.ID)
 	s.Require().NoError(err, "GetByID")
-	s.Require().Equal("sk-create-test", got.Key)
+	s.Require().Empty(got.Key)
+	s.Require().Equal(key.KeyHash, got.KeyHash)
 }
 
 func (s *APIKeyRepoSuite) TestGetByID_NotFound() {
@@ -70,9 +71,9 @@ func (s *APIKeyRepoSuite) TestGetByKey() {
 		GroupID: &group.ID,
 		Status:  service.StatusActive,
 	}
-	s.Require().NoError(s.repo.Create(s.ctx, key))
+	s.Require().NoError(s.repo.Create(s.ctx, withTestAPIKeyCredential(key)))
 
-	got, err := s.repo.GetByKey(s.ctx, key.Key)
+	got, err := s.repo.GetByKey(s.ctx, key.KeyHash)
 	s.Require().NoError(err, "GetByKey")
 	s.Require().Equal(key.ID, got.ID)
 	s.Require().NotNil(got.User, "expected User preload")
@@ -114,9 +115,9 @@ func (s *APIKeyRepoSuite) TestGetByKeyForAuth_PreservesMessagesDispatchModelConf
 		GroupID: &group.ID,
 		Status:  service.StatusActive,
 	}
-	s.Require().NoError(s.repo.Create(s.ctx, key))
+	s.Require().NoError(s.repo.Create(s.ctx, withTestAPIKeyCredential(key)))
 
-	got, err := s.repo.GetByKeyForAuth(s.ctx, key.Key)
+	got, err := s.repo.GetByKeyForAuth(s.ctx, key.KeyHash)
 	s.Require().NoError(err)
 	s.Require().NotNil(got.Group)
 	s.Require().True(got.Group.AllowMessagesDispatch)
@@ -135,7 +136,7 @@ func (s *APIKeyRepoSuite) TestUpdate() {
 		Name:   "Original",
 		Status: service.StatusActive,
 	}
-	s.Require().NoError(s.repo.Create(s.ctx, key))
+	s.Require().NoError(s.repo.Create(s.ctx, withTestAPIKeyCredential(key)))
 
 	key.Name = "Renamed"
 	key.Status = service.StatusDisabled
@@ -144,7 +145,8 @@ func (s *APIKeyRepoSuite) TestUpdate() {
 
 	got, err := s.repo.GetByID(s.ctx, key.ID)
 	s.Require().NoError(err, "GetByID after update")
-	s.Require().Equal("sk-update", got.Key, "Update should not change key")
+	s.Require().Empty(got.Key, "repository must not hydrate plaintext")
+	s.Require().Equal(key.KeyHash, got.KeyHash, "Update should not change key digest")
 	s.Require().Equal(user.ID, got.UserID, "Update should not change user_id")
 	s.Require().Equal("Renamed", got.Name)
 	s.Require().Equal(service.StatusDisabled, got.Status)
@@ -160,7 +162,7 @@ func (s *APIKeyRepoSuite) TestUpdate_ClearGroupID() {
 		GroupID: &group.ID,
 		Status:  service.StatusActive,
 	}
-	s.Require().NoError(s.repo.Create(s.ctx, key))
+	s.Require().NoError(s.repo.Create(s.ctx, withTestAPIKeyCredential(key)))
 
 	key.GroupID = nil
 	err := s.repo.Update(s.ctx, key, service.APIKeyUpdateFields{GroupID: true})
@@ -181,7 +183,7 @@ func (s *APIKeyRepoSuite) TestDelete() {
 		Name:   "Delete Me",
 		Status: service.StatusActive,
 	}
-	s.Require().NoError(s.repo.Create(s.ctx, key))
+	s.Require().NoError(s.repo.Create(s.ctx, withTestAPIKeyCredential(key)))
 
 	err := s.repo.Delete(s.ctx, key.ID)
 	s.Require().NoError(err, "Delete")
@@ -200,7 +202,7 @@ func (s *APIKeyRepoSuite) TestCreate_AfterSoftDelete_AllowsSameKey() {
 		Name:   "First Key",
 		Status: service.StatusActive,
 	}
-	s.Require().NoError(s.repo.Create(s.ctx, first), "create first key")
+	s.Require().NoError(s.repo.Create(s.ctx, withTestAPIKeyCredential(first)), "create first key")
 
 	s.Require().NoError(s.repo.Delete(s.ctx, first.ID), "soft delete first key")
 
@@ -210,7 +212,7 @@ func (s *APIKeyRepoSuite) TestCreate_AfterSoftDelete_AllowsSameKey() {
 		Name:   "Second Key",
 		Status: service.StatusActive,
 	}
-	s.Require().NoError(s.repo.Create(s.ctx, second), "create second key with same key")
+	s.Require().NoError(s.repo.Create(s.ctx, withTestAPIKeyCredential(second)), "create second key with same key")
 	s.Require().NotZero(second.ID)
 	s.Require().NotEqual(first.ID, second.ID, "recreated key should be a new row")
 }
@@ -283,13 +285,14 @@ func (s *APIKeyRepoSuite) TestCountByGroupID() {
 
 func (s *APIKeyRepoSuite) TestExistsByKey() {
 	user := s.mustCreateUser("exists@test.com")
-	s.mustCreateApiKey(user.ID, "sk-exists", "K", nil)
+	key := s.mustCreateApiKey(user.ID, "sk-exists", "K", nil)
 
-	exists, err := s.repo.ExistsByKey(s.ctx, "sk-exists")
+	exists, err := s.repo.ExistsByKey(s.ctx, key.KeyHash)
 	s.Require().NoError(err, "ExistsByKey")
 	s.Require().True(exists)
 
-	notExists, err := s.repo.ExistsByKey(s.ctx, "sk-not-exists")
+	missing := withTestAPIKeyCredential(&service.APIKey{Key: "sk-not-exists"})
+	notExists, err := s.repo.ExistsByKey(s.ctx, missing.KeyHash)
 	s.Require().NoError(err)
 	s.Require().False(notExists)
 }
@@ -357,7 +360,7 @@ func (s *APIKeyRepoSuite) TestCRUD_Search_ClearGroupID() {
 	key := s.mustCreateApiKey(user.ID, "sk-test-1", "My Key", &group.ID)
 	key.GroupID = &group.ID
 
-	got, err := s.repo.GetByKey(s.ctx, key.Key)
+	got, err := s.repo.GetByKey(s.ctx, key.KeyHash)
 	s.Require().NoError(err, "GetByKey")
 	s.Require().Equal(key.ID, got.ID)
 	s.Require().NotNil(got.User)
@@ -372,7 +375,8 @@ func (s *APIKeyRepoSuite) TestCRUD_Search_ClearGroupID() {
 
 	got2, err := s.repo.GetByID(s.ctx, key.ID)
 	s.Require().NoError(err, "GetByID")
-	s.Require().Equal("sk-test-1", got2.Key, "Update should not change key")
+	s.Require().Empty(got2.Key, "repository must not hydrate plaintext")
+	s.Require().Equal(key.KeyHash, got2.KeyHash, "Update should not change key digest")
 	s.Require().Equal(user.ID, got2.UserID, "Update should not change user_id")
 	s.Require().Equal("Renamed", got2.Name)
 	s.Require().Equal(service.StatusDisabled, got2.Status)
@@ -383,7 +387,7 @@ func (s *APIKeyRepoSuite) TestCRUD_Search_ClearGroupID() {
 	s.Require().Equal(int64(1), page.Total)
 	s.Require().Len(keys, 1)
 
-	exists, err := s.repo.ExistsByKey(s.ctx, "sk-test-1")
+	exists, err := s.repo.ExistsByKey(s.ctx, key.KeyHash)
 	s.Require().NoError(err, "ExistsByKey")
 	s.Require().True(exists, "expected key to exist")
 
@@ -447,7 +451,7 @@ func (s *APIKeyRepoSuite) mustCreateApiKey(userID int64, key, name string, group
 		GroupID: groupID,
 		Status:  service.StatusActive,
 	}
-	s.Require().NoError(s.repo.Create(s.ctx, k), "create api key")
+	s.Require().NoError(s.repo.Create(s.ctx, withTestAPIKeyCredential(k)), "create api key")
 	return k
 }
 
@@ -494,7 +498,7 @@ func (s *APIKeyRepoSuite) TestIncrementQuotaUsedAndGetState() {
 	s.Require().Equal(3.5, state.QuotaUsed)
 	s.Require().Equal(3.0, state.Quota)
 	s.Require().Equal(service.StatusAPIKeyQuotaExhausted, state.Status)
-	s.Require().Equal(key.Key, state.Key)
+	s.Require().Equal(key.KeyHash, state.KeyHash)
 
 	got, err := s.repo.GetByID(s.ctx, key.ID)
 	s.Require().NoError(err, "GetByID")
@@ -524,7 +528,7 @@ func TestIncrementQuotaUsed_Concurrent(t *testing.T) {
 		Name:   "Concurrent",
 		Status: service.StatusActive,
 	}
-	require.NoError(t, repo.Create(ctx, k), "create api key")
+	require.NoError(t, repo.Create(ctx, withTestAPIKeyCredential(k)), "create api key")
 	t.Cleanup(func() {
 		_ = client.APIKey.DeleteOneID(k.ID).Exec(ctx)
 		_ = client.User.DeleteOneID(u.ID).Exec(ctx)
@@ -564,7 +568,7 @@ func (s *APIKeyRepoSuite) TestDeleteWithAudit_TombstonesWithoutRetainingCredenti
 		Name:   "Audit Me",
 		Status: service.StatusActive,
 	}
-	s.Require().NoError(s.repo.Create(s.ctx, key))
+	s.Require().NoError(s.repo.Create(s.ctx, withTestAPIKeyCredential(key)))
 
 	s.Require().NoError(s.repo.DeleteWithAudit(s.ctx, key.ID))
 
@@ -578,8 +582,7 @@ func (s *APIKeyRepoSuite) TestDeleteWithAudit_TombstonesWithoutRetainingCredenti
 	s.Require().True(rows.Next())
 	s.Require().NoError(rows.Scan(&tombstone, &deletedAt))
 	s.Require().NoError(rows.Close())
-	s.Require().NotEqual("sk-del-audit-1", tombstone)
-	s.Require().Contains(tombstone, "__deleted__")
+	s.Require().Empty(tombstone, "deleted rows must not retain credential material")
 
 	var auditCount int
 	auditRows, err := s.repo.sql.QueryContext(s.ctx,
@@ -594,7 +597,7 @@ func (s *APIKeyRepoSuite) TestDeleteWithAudit_TombstonesWithoutRetainingCredenti
 func (s *APIKeyRepoSuite) TestDeleteWithAudit_RepeatIsIdempotent() {
 	user := s.mustCreateUser("delwithaudit-idem@test.com")
 	key := &service.APIKey{UserID: user.ID, Key: "sk-del-audit-2", Name: "K", Status: service.StatusActive}
-	s.Require().NoError(s.repo.Create(s.ctx, key))
+	s.Require().NoError(s.repo.Create(s.ctx, withTestAPIKeyCredential(key)))
 
 	s.Require().NoError(s.repo.DeleteWithAudit(s.ctx, key.ID))
 	s.Require().NoError(s.repo.DeleteWithAudit(s.ctx, key.ID))

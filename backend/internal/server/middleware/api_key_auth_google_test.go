@@ -27,7 +27,7 @@ func TestGoogleAPIKeyAuthRejectsOversizedCredentialsBeforeLookup(t *testing.T) {
 		calls.Add(1)
 		return nil, service.ErrAPIKeyNotFound
 	}}
-	cfg := &config.Config{RunMode: config.RunModeSimple}
+	cfg := testAPIKeyConfig(&config.Config{RunMode: config.RunModeSimple})
 	svc := service.NewAPIKeyService(repo, nil, nil, nil, nil, nil, cfg)
 	r := gin.New()
 	var reason IngressRejectReason
@@ -53,7 +53,7 @@ func TestGoogleAPIKeyAuthMarksLookupBulkheadRejection(t *testing.T) {
 	repo := fakeAPIKeyRepo{getByKey: func(context.Context, string) (*service.APIKey, error) {
 		return nil, service.ErrAPIKeyAuthOverloaded
 	}}
-	cfg := &config.Config{RunMode: config.RunModeSimple}
+	cfg := testAPIKeyConfig(&config.Config{RunMode: config.RunModeSimple})
 	svc := service.NewAPIKeyService(repo, nil, nil, nil, nil, nil, cfg)
 	r := gin.New()
 	var reason IngressRejectReason
@@ -281,7 +281,7 @@ func newTestAPIKeyService(repo service.APIKeyRepository) *service.APIKeyService 
 		nil, // userSubRepo
 		nil, // userGroupRateRepo
 		nil, // cache
-		&config.Config{},
+		testAPIKeyConfig(&config.Config{}),
 	)
 }
 
@@ -363,7 +363,7 @@ func TestApiKeyAuthWithSubscriptionGoogleSetsGroupContext(t *testing.T) {
 	apiKeyService := service.NewAPIKeyService(
 		fakeAPIKeyRepo{
 			getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
-				if key != apiKey.Key {
+				if key != testAPIKeyDigest(apiKey.Key) {
 					return nil, service.ErrAPIKeyNotFound
 				}
 				clone := *apiKey
@@ -375,7 +375,7 @@ func TestApiKeyAuthWithSubscriptionGoogleSetsGroupContext(t *testing.T) {
 		nil,
 		nil,
 		nil,
-		&config.Config{RunMode: config.RunModeSimple},
+		testAPIKeyConfig(&config.Config{RunMode: config.RunModeSimple}),
 	)
 
 	cfg := &config.Config{RunMode: config.RunModeSimple}
@@ -501,7 +501,7 @@ func TestApiKeyAuthWithSubscriptionGoogle_MarksUnavailableGroupBusinessLimited(t
 	})
 	apiKeyService := newTestAPIKeyService(fakeAPIKeyRepo{
 		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
-			if key != apiKey.Key {
+			if key != testAPIKeyDigest(apiKey.Key) {
 				return nil, service.ErrAPIKeyNotFound
 			}
 			clone := *apiKey
@@ -709,7 +709,7 @@ func TestApiKeyAuthWithSubscriptionGoogle_TouchesLastUsedOnSuccess(t *testing.T)
 	r := gin.New()
 	apiKeyService := newTestAPIKeyService(fakeAPIKeyRepo{
 		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
-			if key != apiKey.Key {
+			if key != testAPIKeyDigest(apiKey.Key) {
 				return nil, service.ErrAPIKeyNotFound
 			}
 			clone := *apiKey
@@ -757,7 +757,7 @@ func TestApiKeyAuthWithSubscriptionGoogle_TouchFailureDoesNotBlock(t *testing.T)
 	r := gin.New()
 	apiKeyService := newTestAPIKeyService(fakeAPIKeyRepo{
 		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
-			if key != apiKey.Key {
+			if key != testAPIKeyDigest(apiKey.Key) {
 				return nil, service.ErrAPIKeyNotFound
 			}
 			clone := *apiKey
@@ -803,7 +803,7 @@ func TestApiKeyAuthWithSubscriptionGoogle_TouchesLastUsedInStandardMode(t *testi
 	r := gin.New()
 	apiKeyService := newTestAPIKeyService(fakeAPIKeyRepo{
 		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
-			if key != apiKey.Key {
+			if key != testAPIKeyDigest(apiKey.Key) {
 				return nil, service.ErrAPIKeyNotFound
 			}
 			clone := *apiKey
@@ -859,7 +859,7 @@ func TestApiKeyAuthWithSubscriptionGoogle_SubscriptionLimitExceededReturns429(t 
 
 	apiKeyService := newTestAPIKeyService(fakeAPIKeyRepo{
 		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
-			if key != apiKey.Key {
+			if key != testAPIKeyDigest(apiKey.Key) {
 				return nil, service.ErrAPIKeyNotFound
 			}
 			clone := *apiKey

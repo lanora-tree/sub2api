@@ -228,6 +228,51 @@ func TestIdempotencyCoordinator_ReplaySucceededResult(t *testing.T) {
 	require.Equal(t, uint64(1), metrics.ReplayTotal)
 }
 
+func TestIdempotencyCoordinatorStoresTransformedOneTimeResponse(t *testing.T) {
+	repo := newInMemoryIdempotencyRepo()
+	coordinator := NewIdempotencyCoordinator(repo, DefaultIdempotencyConfig())
+	opts := IdempotencyExecuteOptions{
+		Scope:          "user.api_keys.create",
+		Method:         "POST",
+		Route:          "/api/v1/keys",
+		ActorScope:     "user:7",
+		RequireKey:     true,
+		IdempotencyKey: "create-key-once",
+		Payload:        map[string]any{"name": "test"},
+		StoredResponseTransform: func(data any) any {
+			original := data.(map[string]any)
+			safe := make(map[string]any, len(original))
+			for key, value := range original {
+				if key != "key" {
+					safe[key] = value
+				}
+			}
+			return safe
+		},
+	}
+	execCount := 0
+	exec := func(context.Context) (any, error) {
+		execCount++
+		return map[string]any{"id": 9, "key": "sk-one-time-secret"}, nil
+	}
+
+	first, err := coordinator.Execute(context.Background(), opts, exec)
+	require.NoError(t, err)
+	require.Equal(t, "sk-one-time-secret", first.Data.(map[string]any)["key"])
+
+	stored, err := repo.GetByScopeAndKeyHash(context.Background(), opts.Scope, HashIdempotencyKey(opts.IdempotencyKey))
+	require.NoError(t, err)
+	require.NotNil(t, stored.ResponseBody)
+	require.NotContains(t, *stored.ResponseBody, "sk-one-time-secret")
+	require.NotContains(t, *stored.ResponseBody, `"key"`)
+
+	replayed, err := coordinator.Execute(context.Background(), opts, exec)
+	require.NoError(t, err)
+	require.True(t, replayed.Replayed)
+	require.Equal(t, 1, execCount)
+	require.NotContains(t, replayed.Data.(map[string]any), "key")
+}
+
 func TestIdempotencyCoordinator_ReclaimExpiredSucceededRecord(t *testing.T) {
 	resetIdempotencyMetricsForTest()
 	repo := newInMemoryIdempotencyRepo()

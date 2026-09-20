@@ -268,10 +268,15 @@ func mustCreateApiKey(t *testing.T, client *dbent.Client, k *service.APIKey) *se
 	if k.Name == "" {
 		k.Name = "default"
 	}
+	withTestAPIKeyCredential(k)
 
 	create := client.APIKey.Create().
 		SetUserID(k.UserID).
-		SetKey(k.Key).
+		SetKey("").
+		SetKeyHash(k.KeyHash).
+		SetKeyPrefix(k.KeyPrefix).
+		SetKeyLastFour(k.KeyLastFour).
+		SetKeyVersion(k.KeyVersion).
 		SetName(k.Name).
 		SetStatus(k.Status)
 	if k.Quota != 0 {

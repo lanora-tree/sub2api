@@ -19,7 +19,7 @@ func (s *APIKeyRepoSuite) TestUpdate_DoesNotRevertConcurrentQuotaUsage() {
 		Status: service.StatusActive,
 		Quota:  100,
 	}
-	s.Require().NoError(s.repo.Create(s.ctx, key), "Create")
+	s.Require().NoError(s.repo.Create(s.ctx, withTestAPIKeyCredential(key)), "Create")
 
 	stale, err := s.repo.GetByID(s.ctx, key.ID)
 	s.Require().NoError(err, "GetByID")
@@ -50,7 +50,7 @@ func (s *APIKeyRepoSuite) TestUpdate_DoesNotRevertConcurrentRateLimitUsage() {
 		Status:      service.StatusActive,
 		RateLimit5h: 100,
 	}
-	s.Require().NoError(s.repo.Create(s.ctx, key), "Create")
+	s.Require().NoError(s.repo.Create(s.ctx, withTestAPIKeyCredential(key)), "Create")
 
 	stale, err := s.repo.GetByID(s.ctx, key.ID)
 	s.Require().NoError(err, "GetByID")
@@ -81,7 +81,7 @@ func (s *APIKeyRepoSuite) TestUpdate_StillResetsUsageWhenDeclared() {
 		Status: service.StatusActive,
 		Quota:  100,
 	}
-	s.Require().NoError(s.repo.Create(s.ctx, key), "Create")
+	s.Require().NoError(s.repo.Create(s.ctx, withTestAPIKeyCredential(key)), "Create")
 
 	_, err := s.repo.IncrementQuotaUsed(s.ctx, key.ID, 30)
 	s.Require().NoError(err, "IncrementQuotaUsed")

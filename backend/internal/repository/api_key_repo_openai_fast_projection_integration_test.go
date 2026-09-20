@@ -26,9 +26,9 @@ func TestGetByKeyForAuthCarriesGroupForceOpenAIFast(t *testing.T) {
 	keyValue := fmt.Sprintf("sk-fast-proj-%d", suffix)
 	apiKeyRepo := NewAPIKeyRepository(integrationEntClient, integrationDB)
 	key := &service.APIKey{UserID: user.ID, GroupID: &groupID, Key: keyValue, Name: "fast-proj", Status: service.StatusActive}
-	require.NoError(t, apiKeyRepo.Create(ctx, key))
+	require.NoError(t, apiKeyRepo.Create(ctx, withTestAPIKeyCredential(key)))
 	t.Cleanup(func() {
-		_, err := integrationDB.ExecContext(ctx, "DELETE FROM auth_cache_invalidation_outbox WHERE cache_key = encode(sha256(convert_to($1, 'UTF8')), 'hex')", keyValue)
+		_, err := integrationDB.ExecContext(ctx, "DELETE FROM auth_cache_invalidation_outbox WHERE cache_key = $1", key.KeyHash)
 		require.NoError(t, err)
 		_, err = integrationDB.ExecContext(ctx, "DELETE FROM api_keys WHERE id = $1", key.ID)
 		require.NoError(t, err)
@@ -38,7 +38,7 @@ func TestGetByKeyForAuthCarriesGroupForceOpenAIFast(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	got, err := apiKeyRepo.GetByKeyForAuth(ctx, keyValue)
+	got, err := apiKeyRepo.GetByKeyForAuth(ctx, key.KeyHash)
 	require.NoError(t, err)
 	require.NotNil(t, got.Group)
 	require.True(t, got.Group.ForceOpenAIFast)

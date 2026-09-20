@@ -95,6 +95,16 @@ export default {
     created: '创建时间',
     copyToClipboard: '复制到剪贴板',
     copied: '已复制！',
+    secretUnavailable: 'Secret 不可恢复',
+    secretUnavailableHint: '为保护凭据，已创建密钥的完整 Secret 不可再次读取。请粘贴创建时保存的 Secret，或新建密钥。',
+    createdSecret: {
+      title: '保存新的 API Key',
+      warningTitle: '这是唯一一次显示完整 Secret',
+      warning: '请立即复制并保存到密码管理器。关闭后服务器和后台都无法恢复，只能创建新密钥。',
+      copy: '复制 Secret',
+      saved: '我已安全保存',
+      replayUnavailable: '该创建请求已被幂等重放，完整 Secret 不会再次显示。请使用首次保存的 Secret，或创建新密钥。'
+    },
     importToCcSwitch: '导入到 CCS',
     enable: '启用',
     disable: '禁用',

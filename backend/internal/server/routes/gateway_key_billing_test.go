@@ -10,6 +10,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/handler"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/apikeyhmac"
 	servermiddleware "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/Wei-Shaw/sub2api/internal/web"
@@ -22,8 +23,18 @@ type keyBillingRouteAPIKeyRepo struct {
 	apiKey *service.APIKey
 }
 
+const keyBillingRouteTestPepper = "route-test-api-key-pepper-0123456789abcdef"
+
+func keyBillingRouteDigest(raw string) string {
+	keyring, err := apikeyhmac.NewKeyring(1, keyBillingRouteTestPepper, 0, "", "")
+	if err != nil {
+		panic(err)
+	}
+	return keyring.Active(raw).Digest
+}
+
 func (r *keyBillingRouteAPIKeyRepo) GetByKeyForAuth(_ context.Context, key string) (*service.APIKey, error) {
-	if r.apiKey == nil || key != r.apiKey.Key {
+	if r.apiKey == nil || key != keyBillingRouteDigest(r.apiKey.Key) {
 		return nil, service.ErrAPIKeyNotFound
 	}
 	clone := *r.apiKey
@@ -70,7 +81,13 @@ func newKeyBillingRouteTestRouter(runMode string) (*gin.Engine, *keyBillingRoute
 		GroupID: groupID,
 		Group:   apiKeyGroup,
 	}
-	cfg := &config.Config{RunMode: runMode}
+	cfg := &config.Config{
+		RunMode: runMode,
+		APIKeyHMAC: config.APIKeyHMACConfig{
+			ActiveVersion: 1,
+			ActivePepper:  keyBillingRouteTestPepper,
+		},
+	}
 	rateRepo := &keyBillingRouteRateRepo{}
 	apiKeyService := service.NewAPIKeyService(
 		&keyBillingRouteAPIKeyRepo{apiKey: apiKey}, nil, nil, nil, rateRepo, nil, cfg,

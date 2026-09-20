@@ -67,6 +67,17 @@ func TestRedactText_DefaultPathDoesNotUseExtraCache(t *testing.T) {
 	}
 }
 
+func TestRedactText_UserAPIKeyFieldsAreSensitiveByDefault(t *testing.T) {
+	out := RedactText(`api_key=sk-user-secret custom_key: sk-another-secret`)
+
+	if strings.Contains(out, "sk-user-secret") || strings.Contains(out, "sk-another-secret") {
+		t.Fatalf("expected API keys redacted, got %q", out)
+	}
+	if !strings.Contains(out, "api_key=***") || !strings.Contains(out, "custom_key: ***") {
+		t.Fatalf("expected API key fields redacted, got %q", out)
+	}
+}
+
 func clearExtraTextPatternCache() {
 	extraTextPatternCache.Range(func(key, value any) bool {
 		extraTextPatternCache.Delete(key)

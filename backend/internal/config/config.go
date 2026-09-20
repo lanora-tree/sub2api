@@ -89,6 +89,7 @@ type Config struct {
 	Pricing                 PricingConfig                 `mapstructure:"pricing"`
 	Gateway                 GatewayConfig                 `mapstructure:"gateway"`
 	APIKeyAuth              APIKeyAuthCacheConfig         `mapstructure:"api_key_auth_cache"`
+	APIKeyHMAC              APIKeyHMACConfig              `mapstructure:"api_key_hmac"`
 	SubscriptionCache       SubscriptionCacheConfig       `mapstructure:"subscription_cache"`
 	SubscriptionMaintenance SubscriptionMaintenanceConfig `mapstructure:"subscription_maintenance"`
 	Dashboard               DashboardCacheConfig          `mapstructure:"dashboard_cache"`
@@ -2178,6 +2179,14 @@ func setDefaults() {
 	viper.SetDefault("redis.pool_size", 1024)
 	viper.SetDefault("redis.min_idle_conns", 128)
 	viper.SetDefault("redis.enable_tls", false)
+
+	// User API key HMAC storage. Peppers are intentionally empty defaults so
+	// AutomaticEnv can discover API_KEY_HMAC_* without embedding a secret.
+	viper.SetDefault("api_key_hmac.active_version", 1)
+	viper.SetDefault("api_key_hmac.active_pepper", "")
+	viper.SetDefault("api_key_hmac.previous_version", 0)
+	viper.SetDefault("api_key_hmac.previous_pepper", "")
+	viper.SetDefault("api_key_hmac.previous_accept_until", "")
 
 	// Batch Image queue
 	viper.SetDefault("batch_image.enabled", false)

@@ -36,8 +36,25 @@ func (APIKey) Fields() []ent.Field {
 		field.Int64("user_id"),
 		field.String("key").
 			MaxLen(128).
-			NotEmpty().
-			Unique(),
+			Default("").
+			Sensitive().
+			Comment("Deprecated plaintext credential column; must remain empty"),
+		field.String("key_hash").
+			MaxLen(64).
+			Default("").
+			Sensitive().
+			Comment("Lowercase HMAC-SHA256 digest of the credential"),
+		field.String("key_prefix").
+			MaxLen(32).
+			Default("").
+			Comment("Non-secret display prefix"),
+		field.String("key_last_four").
+			MaxLen(4).
+			Default("").
+			Comment("Non-secret final four characters"),
+		field.Int("key_version").
+			Default(0).
+			Comment("HMAC Pepper version used for key_hash"),
 		field.String("name").
 			MaxLen(100).
 			NotEmpty(),
@@ -135,7 +152,6 @@ func (APIKey) Edges() []ent.Edge {
 
 func (APIKey) Indexes() []ent.Index {
 	return []ent.Index{
-		// key 字段已在 Fields() 中声明 Unique()，无需重复索引
 		index.Fields("user_id"),
 		index.Fields("group_id"),
 		index.Fields("status"),

@@ -1079,7 +1079,7 @@ func (s *adminServiceImpl) DeleteGroup(ctx context.Context, id int64) error {
 	}
 	if s.authCacheInvalidator != nil {
 		for _, key := range groupKeys {
-			s.authCacheInvalidator.InvalidateAuthCacheByKey(ctx, key)
+			invalidateAPIKeyAuthCacheByDigest(ctx, s.authCacheInvalidator, key)
 		}
 	}
 
@@ -1241,7 +1241,7 @@ func (s *adminServiceImpl) AdminUpdateAPIKeyGroupID(ctx context.Context, keyID i
 
 			// 失效认证缓存（在事务提交后执行）
 			if s.authCacheInvalidator != nil {
-				s.authCacheInvalidator.InvalidateAuthCacheByKey(ctx, apiKey.Key)
+				invalidateAPIKeyAuthCacheByDigest(ctx, s.authCacheInvalidator, apiKey.KeyHash)
 			}
 
 			result.APIKey = apiKey
@@ -1256,7 +1256,7 @@ func (s *adminServiceImpl) AdminUpdateAPIKeyGroupID(ctx context.Context, keyID i
 
 	// 失效认证缓存
 	if s.authCacheInvalidator != nil {
-		s.authCacheInvalidator.InvalidateAuthCacheByKey(ctx, apiKey.Key)
+		invalidateAPIKeyAuthCacheByDigest(ctx, s.authCacheInvalidator, apiKey.KeyHash)
 	}
 
 	result.APIKey = apiKey
@@ -1279,7 +1279,7 @@ func (s *adminServiceImpl) AdminResetAPIKeyRateLimitUsage(ctx context.Context, k
 		return nil, fmt.Errorf("reset api key rate limit usage: %w", err)
 	}
 	if s.authCacheInvalidator != nil {
-		s.authCacheInvalidator.InvalidateAuthCacheByKey(ctx, apiKey.Key)
+		invalidateAPIKeyAuthCacheByDigest(ctx, s.authCacheInvalidator, apiKey.KeyHash)
 	}
 	if s.billingCacheService != nil {
 		_ = s.billingCacheService.InvalidateAPIKeyRateLimit(ctx, apiKey.ID)
@@ -1344,7 +1344,7 @@ func (s *adminServiceImpl) ReplaceUserGroup(ctx context.Context, userID, oldGrou
 		keys, keyErr := s.apiKeyRepo.ListKeysByUserID(ctx, userID)
 		if keyErr == nil {
 			for _, k := range keys {
-				s.authCacheInvalidator.InvalidateAuthCacheByKey(ctx, k)
+				invalidateAPIKeyAuthCacheByDigest(ctx, s.authCacheInvalidator, k)
 			}
 		}
 	}

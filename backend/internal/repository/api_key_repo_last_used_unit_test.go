@@ -31,6 +31,8 @@ func newAPIKeyRepoSQLite(t *testing.T) (*apiKeyRepository, *dbent.Client) {
 	drv := entsql.OpenDB(dialect.SQLite, db)
 	client := enttest.NewClient(t, enttest.WithOptions(dbent.Driver(drv)))
 	t.Cleanup(func() { _ = client.Close() })
+	_, err = db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_api_keys_key_hash_active ON api_keys (key_hash) WHERE key_hash <> ''`)
+	require.NoError(t, err)
 
 	return &apiKeyRepository{client: client, sql: db}, client
 }
@@ -100,9 +102,9 @@ func TestAPIKeyRepositoryListByUserIDAttachesLastUsedIP(t *testing.T) {
 		Name:   "No Logs",
 		Status: service.StatusActive,
 	}
-	require.NoError(t, repo.Create(ctx, withLogs))
-	require.NoError(t, repo.Create(ctx, emptyOnly))
-	require.NoError(t, repo.Create(ctx, noLogs))
+	require.NoError(t, repo.Create(ctx, withTestAPIKeyCredential(withLogs)))
+	require.NoError(t, repo.Create(ctx, withTestAPIKeyCredential(emptyOnly)))
+	require.NoError(t, repo.Create(ctx, withTestAPIKeyCredential(noLogs)))
 
 	olderIP := "198.51.100.10"
 	newerEmptyIP := ""
@@ -154,7 +156,7 @@ func TestAPIKeyRepository_CreateWithLastUsedAt(t *testing.T) {
 		LastUsedAt: &lastUsed,
 	}
 
-	require.NoError(t, repo.Create(ctx, key))
+	require.NoError(t, repo.Create(ctx, withTestAPIKeyCredential(key)))
 	require.NotNil(t, key.LastUsedAt)
 	require.WithinDuration(t, lastUsed, *key.LastUsedAt, time.Second)
 
@@ -175,7 +177,7 @@ func TestAPIKeyRepository_UpdateLastUsed(t *testing.T) {
 		Name:   "UpdateLastUsed",
 		Status: service.StatusActive,
 	}
-	require.NoError(t, repo.Create(ctx, key))
+	require.NoError(t, repo.Create(ctx, withTestAPIKeyCredential(key)))
 
 	before, err := repo.GetByID(ctx, key.ID)
 	require.NoError(t, err)
@@ -202,7 +204,7 @@ func TestAPIKeyRepository_UpdateLastUsedDeletedKey(t *testing.T) {
 		Name:   "UpdateLastUsedDeleted",
 		Status: service.StatusActive,
 	}
-	require.NoError(t, repo.Create(ctx, key))
+	require.NoError(t, repo.Create(ctx, withTestAPIKeyCredential(key)))
 	require.NoError(t, repo.Delete(ctx, key.ID))
 
 	err := repo.UpdateLastUsed(ctx, key.ID, time.Now().UTC())
@@ -220,7 +222,7 @@ func TestAPIKeyRepository_UpdateLastUsedDBError(t *testing.T) {
 		Name:   "UpdateLastUsedDBError",
 		Status: service.StatusActive,
 	}
-	require.NoError(t, repo.Create(ctx, key))
+	require.NoError(t, repo.Create(ctx, withTestAPIKeyCredential(key)))
 
 	require.NoError(t, client.Close())
 	err := repo.UpdateLastUsed(ctx, key.ID, time.Now().UTC())
@@ -245,7 +247,7 @@ func TestAPIKeyRepository_CreateDuplicateKey(t *testing.T) {
 		Status: service.StatusActive,
 	}
 
-	require.NoError(t, repo.Create(ctx, first))
-	err := repo.Create(ctx, second)
+	require.NoError(t, repo.Create(ctx, withTestAPIKeyCredential(first)))
+	err := repo.Create(ctx, withTestAPIKeyCredential(second))
 	require.ErrorIs(t, err, service.ErrAPIKeyExists)
 }

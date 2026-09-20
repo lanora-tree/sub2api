@@ -84,7 +84,9 @@ func APIKeyFromService(k *service.APIKey) *APIKey {
 	out := &APIKey{
 		ID:                 k.ID,
 		UserID:             k.UserID,
-		Key:                k.Key,
+		KeyPrefix:          k.KeyPrefix,
+		KeyLastFour:        k.KeyLastFour,
+		MaskedKey:          maskedAPIKey(k.KeyPrefix, k.KeyLastFour),
 		Name:               k.Name,
 		GroupID:            k.GroupID,
 		Status:             k.Status,
@@ -123,6 +125,24 @@ func APIKeyFromService(k *service.APIKey) *APIKey {
 		out.Reset7dAt = &t
 	}
 	return out
+}
+
+// APIKeyCreatedFromService is the only DTO mapper permitted to expose the
+// transient plaintext Secret. All list/detail/update/admin mappers use the
+// safe APIKeyFromService path above.
+func APIKeyCreatedFromService(k *service.APIKey) *APIKey {
+	out := APIKeyFromService(k)
+	if out != nil {
+		out.Key = k.Key
+	}
+	return out
+}
+
+func maskedAPIKey(prefix, lastFour string) string {
+	if prefix == "" && lastFour == "" {
+		return ""
+	}
+	return prefix + "••••" + lastFour
 }
 
 func GroupFromServiceShallow(g *service.Group) *Group {

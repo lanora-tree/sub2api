@@ -56,7 +56,10 @@ type AdminUser struct {
 type APIKey struct {
 	ID          int64      `json:"id"`
 	UserID      int64      `json:"user_id"`
-	Key         string     `json:"key"`
+	Key         string     `json:"key,omitempty"`
+	KeyPrefix   string     `json:"key_prefix"`
+	KeyLastFour string     `json:"key_last_four"`
+	MaskedKey   string     `json:"masked_key"`
 	Name        string     `json:"name"`
 	GroupID     *int64     `json:"group_id"`
 	Status      string     `json:"status"`

@@ -118,10 +118,11 @@
             class="input flex-1"
             :placeholder="editing ? t('admin.channelMonitor.form.apiKeyEditPlaceholder') : t('admin.channelMonitor.form.apiKeyPlaceholder')"
           />
-          <button type="button" @click="openMyKeyPicker" class="btn btn-secondary whitespace-nowrap">
+          <button type="button" disabled class="btn btn-secondary cursor-not-allowed whitespace-nowrap opacity-60" :title="t('keys.secretUnavailableHint')" @click="openMyKeyPicker">
             {{ t('admin.channelMonitor.form.useMyKey') }}
           </button>
         </div>
+        <p class="mt-1 text-xs text-amber-600 dark:text-amber-400">{{ t('keys.secretUnavailableHint') }}</p>
         <p v-if="editing && editing.api_key_masked" class="mt-1 text-xs text-gray-400">{{ editing.api_key_masked }}</p>
       </div>
 

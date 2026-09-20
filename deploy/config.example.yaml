@@ -662,6 +662,22 @@ token_refresh:
   cycle_timeout_seconds: 240
 
 # =============================================================================
+# User API Key HMAC Configuration (required)
+# 用户 API Key HMAC 配置（必填）
+# =============================================================================
+api_key_hmac:
+  # Keep Peppers outside PostgreSQL and database backups. Prefer environment
+  # variables API_KEY_HMAC_ACTIVE_* instead of committing secrets here.
+  # Pepper 不得写入 PostgreSQL 或提交到仓库，推荐通过环境变量注入。
+  active_version: 1
+  active_pepper: ""
+  # Optional bounded rotation window; configure all fields together.
+  # 可选的有限轮换窗口；三个字段必须同时配置。
+  previous_version: 0
+  previous_pepper: ""
+  previous_accept_until: "" # RFC3339 UTC, e.g. 2026-10-01T00:00:00Z
+
+# =============================================================================
 # API Key Auth Cache Configuration
 # API Key 认证缓存配置
 # =============================================================================

@@ -333,7 +333,7 @@ generate_secret() {
 }
 
 cmd_init() {
-    local env_dir temp_file postgres_secret jwt_secret totp_secret
+    local env_dir temp_file postgres_secret jwt_secret totp_secret api_key_hmac_pepper
 
     require_command openssl
 
@@ -344,7 +344,8 @@ cmd_init() {
     postgres_secret="$(generate_secret)" || die "Failed to generate PostgreSQL password."
     jwt_secret="$(generate_secret)" || die "Failed to generate JWT secret."
     totp_secret="$(generate_secret)" || die "Failed to generate TOTP encryption key."
-    [[ -n "${postgres_secret}" && -n "${jwt_secret}" && -n "${totp_secret}" ]] || \
+    api_key_hmac_pepper="$(generate_secret)" || die "Failed to generate API key HMAC Pepper."
+    [[ -n "${postgres_secret}" && -n "${jwt_secret}" && -n "${totp_secret}" && -n "${api_key_hmac_pepper}" ]] || \
         die "Secret generation returned an empty value."
 
     env_dir="$(dirname "${ENV_FILE}")"
@@ -355,6 +356,7 @@ cmd_init() {
     replace_env_value POSTGRES_PASSWORD "${postgres_secret}" "${temp_file}"
     replace_env_value JWT_SECRET "${jwt_secret}" "${temp_file}"
     replace_env_value TOTP_ENCRYPTION_KEY "${totp_secret}" "${temp_file}"
+    replace_env_value API_KEY_HMAC_ACTIVE_PEPPER "${api_key_hmac_pepper}" "${temp_file}"
     mv "${temp_file}" "${ENV_FILE}"
 
     info "Created ${ENV_FILE} with generated secrets."

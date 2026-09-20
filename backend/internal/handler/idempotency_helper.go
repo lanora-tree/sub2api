@@ -21,6 +21,17 @@ func executeUserIdempotentJSON(
 	ttl time.Duration,
 	execute func(context.Context) (any, error),
 ) {
+	executeUserIdempotentJSONWithStoredResponse(c, scope, payload, ttl, nil, execute)
+}
+
+func executeUserIdempotentJSONWithStoredResponse(
+	c *gin.Context,
+	scope string,
+	payload any,
+	ttl time.Duration,
+	storedResponseTransform func(any) any,
+	execute func(context.Context) (any, error),
+) {
 	coordinator := service.DefaultIdempotencyCoordinator()
 	if coordinator == nil {
 		data, err := execute(c.Request.Context())
@@ -38,14 +49,15 @@ func executeUserIdempotentJSON(
 	}
 
 	result, err := coordinator.Execute(c.Request.Context(), service.IdempotencyExecuteOptions{
-		Scope:          scope,
-		ActorScope:     actorScope,
-		Method:         c.Request.Method,
-		Route:          c.FullPath(),
-		IdempotencyKey: c.GetHeader("Idempotency-Key"),
-		Payload:        payload,
-		RequireKey:     true,
-		TTL:            ttl,
+		Scope:                   scope,
+		ActorScope:              actorScope,
+		Method:                  c.Request.Method,
+		Route:                   c.FullPath(),
+		IdempotencyKey:          c.GetHeader("Idempotency-Key"),
+		Payload:                 payload,
+		RequireKey:              true,
+		TTL:                     ttl,
+		StoredResponseTransform: storedResponseTransform,
 	}, execute)
 	if err != nil {
 		if infraerrors.Code(err) == infraerrors.Code(service.ErrIdempotencyStoreUnavail) {

@@ -405,8 +405,8 @@ func (s *adminServiceImpl) DeleteUser(ctx context.Context, id int64) error {
 
 	if s.authCacheInvalidator != nil {
 		for _, key := range apiKeys {
-			if keyValue := strings.TrimSpace(key.Key); keyValue != "" {
-				s.authCacheInvalidator.InvalidateAuthCacheByKey(ctx, keyValue)
+			if keyHash := strings.TrimSpace(key.KeyHash); keyHash != "" {
+				invalidateAPIKeyAuthCacheByDigest(ctx, s.authCacheInvalidator, keyHash)
 			}
 		}
 		s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, id)

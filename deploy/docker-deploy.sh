@@ -4,7 +4,7 @@
 # =============================================================================
 # This script prepares deployment files for Sub2API:
 #   - Downloads docker-compose.local.yml and .env.example
-#   - Generates secure secrets (JWT_SECRET, TOTP_ENCRYPTION_KEY, POSTGRES_PASSWORD)
+#   - Generates secure secrets (JWT, TOTP, API-key HMAC, PostgreSQL)
 #   - Creates necessary data directories
 #
 # After running this script, you can start services with:
@@ -103,6 +103,7 @@ main() {
     # Generate secrets
     JWT_SECRET=$(generate_secret)
     TOTP_ENCRYPTION_KEY=$(generate_secret)
+    API_KEY_HMAC_ACTIVE_PEPPER=$(generate_secret)
     POSTGRES_PASSWORD=$(generate_secret)
 
     # Create .env from .env.example
@@ -113,11 +114,13 @@ main() {
         # GNU sed (Linux)
         sed -i "s/^JWT_SECRET=.*/JWT_SECRET=${JWT_SECRET}/" .env
         sed -i "s/^TOTP_ENCRYPTION_KEY=.*/TOTP_ENCRYPTION_KEY=${TOTP_ENCRYPTION_KEY}/" .env
+        sed -i "s/^API_KEY_HMAC_ACTIVE_PEPPER=.*/API_KEY_HMAC_ACTIVE_PEPPER=${API_KEY_HMAC_ACTIVE_PEPPER}/" .env
         sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${POSTGRES_PASSWORD}/" .env
     else
         # BSD sed (macOS)
         sed -i '' "s/^JWT_SECRET=.*/JWT_SECRET=${JWT_SECRET}/" .env
         sed -i '' "s/^TOTP_ENCRYPTION_KEY=.*/TOTP_ENCRYPTION_KEY=${TOTP_ENCRYPTION_KEY}/" .env
+        sed -i '' "s/^API_KEY_HMAC_ACTIVE_PEPPER=.*/API_KEY_HMAC_ACTIVE_PEPPER=${API_KEY_HMAC_ACTIVE_PEPPER}/" .env
         sed -i '' "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${POSTGRES_PASSWORD}/" .env
     fi
 
@@ -139,6 +142,7 @@ main() {
     echo "  POSTGRES_PASSWORD:     ${POSTGRES_PASSWORD}"
     echo "  JWT_SECRET:            ${JWT_SECRET}"
     echo "  TOTP_ENCRYPTION_KEY:   ${TOTP_ENCRYPTION_KEY}"
+    echo "  API key HMAC Pepper:   saved to .env (not displayed)"
     echo ""
     print_warning "These credentials have been saved to .env file."
     print_warning "Please keep them secure and do not share publicly!"

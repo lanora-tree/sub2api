@@ -28,7 +28,7 @@ func TestAPIKeyAuthRejectsOversizedCredentialsBeforeLookup(t *testing.T) {
 		calls.Add(1)
 		return nil, service.ErrAPIKeyNotFound
 	}}
-	cfg := &config.Config{RunMode: config.RunModeSimple}
+	cfg := testAPIKeyConfig(&config.Config{RunMode: config.RunModeSimple})
 	svc := service.NewAPIKeyService(repo, nil, nil, nil, nil, nil, cfg)
 
 	for _, headers := range []map[string]string{
@@ -81,7 +81,7 @@ func TestSimpleModeBypassesQuotaCheck(t *testing.T) {
 
 	apiKeyRepo := &stubApiKeyRepo{
 		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
-			if key != apiKey.Key {
+			if key != testAPIKeyDigest(apiKey.Key) {
 				return nil, service.ErrAPIKeyNotFound
 			}
 			clone := *apiKey
@@ -90,7 +90,7 @@ func TestSimpleModeBypassesQuotaCheck(t *testing.T) {
 	}
 
 	t.Run("standard_mode_completes_maintenance_before_request", func(t *testing.T) {
-		cfg := &config.Config{RunMode: config.RunModeStandard}
+		cfg := testAPIKeyConfig(&config.Config{RunMode: config.RunModeStandard})
 		cfg.SubscriptionMaintenance.WorkerCount = 1
 		cfg.SubscriptionMaintenance.QueueSize = 1
 
@@ -155,7 +155,7 @@ func TestSimpleModeBypassesQuotaCheck(t *testing.T) {
 	})
 
 	t.Run("standard_mode_revalidates_cas_loser_from_database", func(t *testing.T) {
-		cfg := &config.Config{RunMode: config.RunModeStandard}
+		cfg := testAPIKeyConfig(&config.Config{RunMode: config.RunModeStandard})
 		apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
 
 		past := time.Now().Add(-48 * time.Hour)
@@ -202,7 +202,7 @@ func TestSimpleModeBypassesQuotaCheck(t *testing.T) {
 	})
 
 	t.Run("simple_mode_bypasses_quota_check", func(t *testing.T) {
-		cfg := &config.Config{RunMode: config.RunModeSimple}
+		cfg := testAPIKeyConfig(&config.Config{RunMode: config.RunModeSimple})
 		apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
 		subscriptionService := service.NewSubscriptionService(nil, &stubUserSubscriptionRepo{}, nil, nil, cfg)
 		router := newAuthTestRouter(apiKeyService, subscriptionService, cfg)
@@ -216,7 +216,7 @@ func TestSimpleModeBypassesQuotaCheck(t *testing.T) {
 	})
 
 	t.Run("simple_mode_accepts_lowercase_bearer", func(t *testing.T) {
-		cfg := &config.Config{RunMode: config.RunModeSimple}
+		cfg := testAPIKeyConfig(&config.Config{RunMode: config.RunModeSimple})
 		apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
 		subscriptionService := service.NewSubscriptionService(nil, &stubUserSubscriptionRepo{}, nil, nil, cfg)
 		router := newAuthTestRouter(apiKeyService, subscriptionService, cfg)
@@ -230,7 +230,7 @@ func TestSimpleModeBypassesQuotaCheck(t *testing.T) {
 	})
 
 	t.Run("standard_mode_enforces_quota_check", func(t *testing.T) {
-		cfg := &config.Config{RunMode: config.RunModeStandard}
+		cfg := testAPIKeyConfig(&config.Config{RunMode: config.RunModeStandard})
 		apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
 
 		now := time.Now()
@@ -299,7 +299,7 @@ func TestAPIKeyAuthSetsGroupContext(t *testing.T) {
 
 	apiKeyRepo := &stubApiKeyRepo{
 		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
-			if key != apiKey.Key {
+			if key != testAPIKeyDigest(apiKey.Key) {
 				return nil, service.ErrAPIKeyNotFound
 			}
 			clone := *apiKey
@@ -307,7 +307,7 @@ func TestAPIKeyAuthSetsGroupContext(t *testing.T) {
 		},
 	}
 
-	cfg := &config.Config{RunMode: config.RunModeSimple}
+	cfg := testAPIKeyConfig(&config.Config{RunMode: config.RunModeSimple})
 	apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
 	router := gin.New()
 	router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(apiKeyService, nil, cfg)))
@@ -363,7 +363,7 @@ func TestAPIKeyAuthRejectsExclusiveGroupWhenUserNoLongerAllowed(t *testing.T) {
 
 	apiKeyRepo := &stubApiKeyRepo{
 		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
-			if key != apiKey.Key {
+			if key != testAPIKeyDigest(apiKey.Key) {
 				return nil, service.ErrAPIKeyNotFound
 			}
 			clone := *apiKey
@@ -371,7 +371,7 @@ func TestAPIKeyAuthRejectsExclusiveGroupWhenUserNoLongerAllowed(t *testing.T) {
 		},
 	}
 
-	cfg := &config.Config{RunMode: config.RunModeSimple}
+	cfg := testAPIKeyConfig(&config.Config{RunMode: config.RunModeSimple})
 	apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
 	router := newAuthTestRouter(apiKeyService, nil, cfg)
 
@@ -413,7 +413,7 @@ func TestAPIKeyAuthOverwritesInvalidContextGroup(t *testing.T) {
 
 	apiKeyRepo := &stubApiKeyRepo{
 		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
-			if key != apiKey.Key {
+			if key != testAPIKeyDigest(apiKey.Key) {
 				return nil, service.ErrAPIKeyNotFound
 			}
 			clone := *apiKey
@@ -421,7 +421,7 @@ func TestAPIKeyAuthOverwritesInvalidContextGroup(t *testing.T) {
 		},
 	}
 
-	cfg := &config.Config{RunMode: config.RunModeSimple}
+	cfg := testAPIKeyConfig(&config.Config{RunMode: config.RunModeSimple})
 	apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
 	router := gin.New()
 	router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(apiKeyService, nil, cfg)))
@@ -531,14 +531,14 @@ func TestAPIKeyAuthRejectsUnavailableGroup(t *testing.T) {
 			}
 			apiKeyRepo := &stubApiKeyRepo{
 				getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
-					if key != apiKey.Key {
+					if key != testAPIKeyDigest(apiKey.Key) {
 						return nil, service.ErrAPIKeyNotFound
 					}
 					clone := *apiKey
 					return &clone, nil
 				},
 			}
-			cfg := &config.Config{RunMode: config.RunModeStandard}
+			cfg := testAPIKeyConfig(&config.Config{RunMode: config.RunModeStandard})
 			apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
 			router := gin.New()
 			var markedBusinessLimited bool
@@ -653,7 +653,7 @@ func TestAPIKeyAuthMarksOnlyExpectedIngressRejections(t *testing.T) {
 			repo := &stubApiKeyRepo{getByKey: func(context.Context, string) (*service.APIKey, error) {
 				return nil, tt.repoErr
 			}}
-			cfg := &config.Config{RunMode: config.RunModeSimple}
+			cfg := testAPIKeyConfig(&config.Config{RunMode: config.RunModeSimple})
 			apiKeyService := service.NewAPIKeyService(repo, nil, nil, nil, nil, nil, cfg)
 			router := gin.New()
 			var reason IngressRejectReason
@@ -711,14 +711,14 @@ func TestAPIKeyAuthSetsOpsFallbackKeyOnEarlyAbort(t *testing.T) {
 	}
 	apiKeyRepo := &stubApiKeyRepo{
 		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
-			if key != apiKey.Key {
+			if key != testAPIKeyDigest(apiKey.Key) {
 				return nil, service.ErrAPIKeyNotFound
 			}
 			clone := *apiKey
 			return &clone, nil
 		},
 	}
-	cfg := &config.Config{RunMode: config.RunModeStandard}
+	cfg := testAPIKeyConfig(&config.Config{RunMode: config.RunModeStandard})
 	apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
 
 	router := gin.New()
@@ -780,14 +780,14 @@ func TestAPIKeyAuthGoogleSetsOpsFallbackKeyOnEarlyAbort(t *testing.T) {
 	}
 	apiKeyRepo := &stubApiKeyRepo{
 		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
-			if key != apiKey.Key {
+			if key != testAPIKeyDigest(apiKey.Key) {
 				return nil, service.ErrAPIKeyNotFound
 			}
 			clone := *apiKey
 			return &clone, nil
 		},
 	}
-	cfg := &config.Config{RunMode: config.RunModeStandard}
+	cfg := testAPIKeyConfig(&config.Config{RunMode: config.RunModeStandard})
 	apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
 
 	router := gin.New()
@@ -884,7 +884,7 @@ func TestAPIKeyAuthIPRestrictionUsesTrustedPathWhenSwitchDisabled(t *testing.T) 
 
 	apiKeyRepo := &stubApiKeyRepo{
 		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
-			if key != apiKey.Key {
+			if key != testAPIKeyDigest(apiKey.Key) {
 				return nil, service.ErrAPIKeyNotFound
 			}
 			clone := *apiKey
@@ -892,7 +892,7 @@ func TestAPIKeyAuthIPRestrictionUsesTrustedPathWhenSwitchDisabled(t *testing.T) 
 		},
 	}
 
-	cfg := &config.Config{RunMode: config.RunModeSimple}
+	cfg := testAPIKeyConfig(&config.Config{RunMode: config.RunModeSimple})
 	cfg.SetTrustForwardedIPForAPIKeyACL(false)
 	apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
 	router := gin.New()
@@ -947,7 +947,7 @@ func TestAPIKeyAuthIPRestrictionIncludesClientIPForBlacklistDenial(t *testing.T)
 
 	apiKeyRepo := &stubApiKeyRepo{
 		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
-			if key != apiKey.Key {
+			if key != testAPIKeyDigest(apiKey.Key) {
 				return nil, service.ErrAPIKeyNotFound
 			}
 			clone := *apiKey
@@ -955,7 +955,7 @@ func TestAPIKeyAuthIPRestrictionIncludesClientIPForBlacklistDenial(t *testing.T)
 		},
 	}
 
-	cfg := &config.Config{RunMode: config.RunModeSimple}
+	cfg := testAPIKeyConfig(&config.Config{RunMode: config.RunModeSimple})
 	apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
 	router := gin.New()
 	require.NoError(t, router.SetTrustedProxies(nil))
@@ -995,7 +995,7 @@ func TestAPIKeyAuthIPRestrictionUsesConfiguredTrustedProxy(t *testing.T) {
 
 	apiKeyRepo := &stubApiKeyRepo{
 		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
-			if key != apiKey.Key {
+			if key != testAPIKeyDigest(apiKey.Key) {
 				return nil, service.ErrAPIKeyNotFound
 			}
 			clone := *apiKey
@@ -1003,7 +1003,7 @@ func TestAPIKeyAuthIPRestrictionUsesConfiguredTrustedProxy(t *testing.T) {
 		},
 	}
 
-	cfg := &config.Config{RunMode: config.RunModeSimple}
+	cfg := testAPIKeyConfig(&config.Config{RunMode: config.RunModeSimple})
 	cfg.SetTrustForwardedIPForAPIKeyACL(false)
 	apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
 	router := gin.New()
@@ -1046,7 +1046,7 @@ func TestAPIKeyAuthIPRestrictionUsesForwardedClientIPInDenialWhenTrusted(t *test
 
 	apiKeyRepo := &stubApiKeyRepo{
 		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
-			if key != apiKey.Key {
+			if key != testAPIKeyDigest(apiKey.Key) {
 				return nil, service.ErrAPIKeyNotFound
 			}
 			clone := *apiKey
@@ -1054,7 +1054,7 @@ func TestAPIKeyAuthIPRestrictionUsesForwardedClientIPInDenialWhenTrusted(t *test
 		},
 	}
 
-	cfg := &config.Config{RunMode: config.RunModeSimple}
+	cfg := testAPIKeyConfig(&config.Config{RunMode: config.RunModeSimple})
 	cfg.SetTrustForwardedIPForAPIKeyACL(false)
 	apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
 	router := gin.New()
@@ -1099,7 +1099,7 @@ func TestAPIKeyAuthTouchesLastUsedOnSuccess(t *testing.T) {
 	var touchedAt time.Time
 	apiKeyRepo := &stubApiKeyRepo{
 		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
-			if key != apiKey.Key {
+			if key != testAPIKeyDigest(apiKey.Key) {
 				return nil, service.ErrAPIKeyNotFound
 			}
 			clone := *apiKey
@@ -1112,7 +1112,7 @@ func TestAPIKeyAuthTouchesLastUsedOnSuccess(t *testing.T) {
 		},
 	}
 
-	cfg := &config.Config{RunMode: config.RunModeSimple}
+	cfg := testAPIKeyConfig(&config.Config{RunMode: config.RunModeSimple})
 	apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
 	router := newAuthTestRouter(apiKeyService, nil, cfg)
 
@@ -1147,7 +1147,7 @@ func TestAPIKeyAuthTouchLastUsedFailureDoesNotBlock(t *testing.T) {
 	touchCalls := 0
 	apiKeyRepo := &stubApiKeyRepo{
 		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
-			if key != apiKey.Key {
+			if key != testAPIKeyDigest(apiKey.Key) {
 				return nil, service.ErrAPIKeyNotFound
 			}
 			clone := *apiKey
@@ -1159,7 +1159,7 @@ func TestAPIKeyAuthTouchLastUsedFailureDoesNotBlock(t *testing.T) {
 		},
 	}
 
-	cfg := &config.Config{RunMode: config.RunModeSimple}
+	cfg := testAPIKeyConfig(&config.Config{RunMode: config.RunModeSimple})
 	apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
 	router := newAuthTestRouter(apiKeyService, nil, cfg)
 
@@ -1193,7 +1193,7 @@ func TestAPIKeyAuthTouchesLastUsedInStandardMode(t *testing.T) {
 	touchCalls := 0
 	apiKeyRepo := &stubApiKeyRepo{
 		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
-			if key != apiKey.Key {
+			if key != testAPIKeyDigest(apiKey.Key) {
 				return nil, service.ErrAPIKeyNotFound
 			}
 			clone := *apiKey
@@ -1205,7 +1205,7 @@ func TestAPIKeyAuthTouchesLastUsedInStandardMode(t *testing.T) {
 		},
 	}
 
-	cfg := &config.Config{RunMode: config.RunModeStandard}
+	cfg := testAPIKeyConfig(&config.Config{RunMode: config.RunModeStandard})
 	apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
 	router := newAuthTestRouter(apiKeyService, nil, cfg)
 
@@ -1267,7 +1267,7 @@ func TestAPIKeyAuthBillingInfoSkipsBillingAndSideEffects(t *testing.T) {
 			return nil, service.ErrSubscriptionNotFound
 		},
 	}
-	cfg := &config.Config{RunMode: config.RunModeStandard}
+	cfg := testAPIKeyConfig(&config.Config{RunMode: config.RunModeStandard})
 	apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
 	subscriptionService := service.NewSubscriptionService(nil, subscriptionRepo, nil, nil, cfg)
 	t.Cleanup(subscriptionService.Stop)
@@ -1299,7 +1299,7 @@ func TestAPIKeyAuthBillingInfoSkipsLastUsedInSimpleMode(t *testing.T) {
 			return nil
 		},
 	}
-	cfg := &config.Config{RunMode: config.RunModeSimple}
+	cfg := testAPIKeyConfig(&config.Config{RunMode: config.RunModeSimple})
 	apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
 	router := newAuthTestRouter(apiKeyService, nil, cfg)
 
@@ -1328,7 +1328,7 @@ func TestAPIKeyAuthUsageStillTouchesLastUsed(t *testing.T) {
 			return nil
 		},
 	}
-	cfg := &config.Config{RunMode: config.RunModeStandard}
+	cfg := testAPIKeyConfig(&config.Config{RunMode: config.RunModeStandard})
 	apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
 	router := newAuthTestRouter(apiKeyService, nil, cfg)
 
@@ -1360,7 +1360,7 @@ func TestAPIKeyAuthAllowsBalanceBelowMinimumReserve(t *testing.T) {
 	}
 	apiKeyRepo := &stubApiKeyRepo{
 		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
-			if key != apiKey.Key {
+			if key != testAPIKeyDigest(apiKey.Key) {
 				return nil, service.ErrAPIKeyNotFound
 			}
 			clone := *apiKey
@@ -1370,7 +1370,7 @@ func TestAPIKeyAuthAllowsBalanceBelowMinimumReserve(t *testing.T) {
 		},
 	}
 
-	cfg := &config.Config{RunMode: config.RunModeStandard}
+	cfg := testAPIKeyConfig(&config.Config{RunMode: config.RunModeStandard})
 	cfg.Billing.MinimumBalanceReserve = 0.01
 	apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
 	router := newAuthTestRouter(apiKeyService, nil, cfg)
@@ -1404,7 +1404,7 @@ func TestAPIKeyAuthRejectsExhaustedBalance(t *testing.T) {
 	}
 	apiKeyRepo := &stubApiKeyRepo{
 		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
-			if key != apiKey.Key {
+			if key != testAPIKeyDigest(apiKey.Key) {
 				return nil, service.ErrAPIKeyNotFound
 			}
 			clone := *apiKey
@@ -1414,7 +1414,7 @@ func TestAPIKeyAuthRejectsExhaustedBalance(t *testing.T) {
 		},
 	}
 
-	cfg := &config.Config{RunMode: config.RunModeStandard}
+	cfg := testAPIKeyConfig(&config.Config{RunMode: config.RunModeStandard})
 	apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
 	router := newAuthTestRouter(apiKeyService, nil, cfg)
 
@@ -1437,7 +1437,7 @@ func TestAPIKeyAuthOpenAIQuotaErrorFormat(t *testing.T) {
 		User: user, Group: group, GroupID: &group.ID,
 	}
 	apiKeyRepo := &stubApiKeyRepo{getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
-		if key != apiKey.Key {
+		if key != testAPIKeyDigest(apiKey.Key) {
 			return nil, service.ErrAPIKeyNotFound
 		}
 		clone := *apiKey
@@ -1446,7 +1446,7 @@ func TestAPIKeyAuthOpenAIQuotaErrorFormat(t *testing.T) {
 		return &clone, nil
 	}}
 
-	cfg := &config.Config{RunMode: config.RunModeStandard}
+	cfg := testAPIKeyConfig(&config.Config{RunMode: config.RunModeStandard})
 	router := newAuthTestRouter(service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg), nil, cfg)
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
@@ -1479,7 +1479,7 @@ func TestAPIKeyAuthQuotaErrorKeepsLegacyFormatOutsideResponses(t *testing.T) {
 		User: user, Group: group, GroupID: &group.ID,
 	}
 	apiKeyRepo := &stubApiKeyRepo{getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
-		if key != apiKey.Key {
+		if key != testAPIKeyDigest(apiKey.Key) {
 			return nil, service.ErrAPIKeyNotFound
 		}
 		clone := *apiKey
@@ -1488,7 +1488,7 @@ func TestAPIKeyAuthQuotaErrorKeepsLegacyFormatOutsideResponses(t *testing.T) {
 		return &clone, nil
 	}}
 
-	cfg := &config.Config{RunMode: config.RunModeStandard}
+	cfg := testAPIKeyConfig(&config.Config{RunMode: config.RunModeStandard})
 	router := newAuthTestRouter(service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg), nil, cfg)
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/v1/messages", nil)

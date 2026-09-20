@@ -69,9 +69,9 @@ func TestAPIKeyRepository_GetByKeyForAuth_PreservesMessagesDispatchModelConfig_S
 		GroupID: &group.ID,
 		Status:  service.StatusActive,
 	}
-	require.NoError(t, repo.Create(ctx, key))
+	require.NoError(t, repo.Create(ctx, withTestAPIKeyCredential(key)))
 
-	got, err := repo.GetByKeyForAuth(ctx, key.Key)
+	got, err := repo.GetByKeyForAuth(ctx, key.KeyHash)
 	require.NoError(t, err)
 	require.Equal(t, key.Name, got.Name)
 	require.NotNil(t, got.Group)

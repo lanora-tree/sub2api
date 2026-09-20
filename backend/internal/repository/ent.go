@@ -107,6 +107,12 @@ func InitEnt(cfg *config.Config) (*ent.Client, *sql.DB, error) {
 	if err := timezone.Init(cfg.Timezone); err != nil {
 		return nil, nil, err
 	}
+	// The API-key Pepper must be present before any schema mutation. Migration
+	// 243 makes plaintext writes impossible, so applying it and only then
+	// discovering a missing Pepper would leave the deployment half-upgraded.
+	if err := cfg.ValidateAPIKeyHMACForRuntime(); err != nil {
+		return nil, nil, fmt.Errorf("validate API key HMAC config: %w", err)
+	}
 
 	// 构建包含时区信息的数据库连接字符串 (DSN)。
 	// 时区信息会传递给 PostgreSQL，确保数据库层面的时间处理正确。
@@ -155,6 +161,10 @@ func InitEnt(cfg *config.Config) (*ent.Client, *sql.DB, error) {
 	if err := cfg.Validate(); err != nil {
 		_ = client.Close()
 		return nil, nil, fmt.Errorf("validate config after secret bootstrap: %w", err)
+	}
+	if err := migrateAPIKeyCredentials(migrationCtx, drv.DB(), cfg, time.Now()); err != nil {
+		_ = client.Close()
+		return nil, nil, err
 	}
 
 	// SIMPLE 模式：启动时补齐各平台默认分组。

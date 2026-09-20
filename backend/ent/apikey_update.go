@@ -86,6 +86,69 @@ func (_u *APIKeyUpdate) SetNillableKey(v *string) *APIKeyUpdate {
 	return _u
 }
 
+// SetKeyHash sets the "key_hash" field.
+func (_u *APIKeyUpdate) SetKeyHash(v string) *APIKeyUpdate {
+	_u.mutation.SetKeyHash(v)
+	return _u
+}
+
+// SetNillableKeyHash sets the "key_hash" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableKeyHash(v *string) *APIKeyUpdate {
+	if v != nil {
+		_u.SetKeyHash(*v)
+	}
+	return _u
+}
+
+// SetKeyPrefix sets the "key_prefix" field.
+func (_u *APIKeyUpdate) SetKeyPrefix(v string) *APIKeyUpdate {
+	_u.mutation.SetKeyPrefix(v)
+	return _u
+}
+
+// SetNillableKeyPrefix sets the "key_prefix" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableKeyPrefix(v *string) *APIKeyUpdate {
+	if v != nil {
+		_u.SetKeyPrefix(*v)
+	}
+	return _u
+}
+
+// SetKeyLastFour sets the "key_last_four" field.
+func (_u *APIKeyUpdate) SetKeyLastFour(v string) *APIKeyUpdate {
+	_u.mutation.SetKeyLastFour(v)
+	return _u
+}
+
+// SetNillableKeyLastFour sets the "key_last_four" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableKeyLastFour(v *string) *APIKeyUpdate {
+	if v != nil {
+		_u.SetKeyLastFour(*v)
+	}
+	return _u
+}
+
+// SetKeyVersion sets the "key_version" field.
+func (_u *APIKeyUpdate) SetKeyVersion(v int) *APIKeyUpdate {
+	_u.mutation.ResetKeyVersion()
+	_u.mutation.SetKeyVersion(v)
+	return _u
+}
+
+// SetNillableKeyVersion sets the "key_version" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableKeyVersion(v *int) *APIKeyUpdate {
+	if v != nil {
+		_u.SetKeyVersion(*v)
+	}
+	return _u
+}
+
+// AddKeyVersion adds value to the "key_version" field.
+func (_u *APIKeyUpdate) AddKeyVersion(v int) *APIKeyUpdate {
+	_u.mutation.AddKeyVersion(v)
+	return _u
+}
+
 // SetName sets the "name" field.
 func (_u *APIKeyUpdate) SetName(v string) *APIKeyUpdate {
 	_u.mutation.SetName(v)
@@ -550,6 +613,21 @@ func (_u *APIKeyUpdate) check() error {
 			return &ValidationError{Name: "key", err: fmt.Errorf(`ent: validator failed for field "APIKey.key": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.KeyHash(); ok {
+		if err := apikey.KeyHashValidator(v); err != nil {
+			return &ValidationError{Name: "key_hash", err: fmt.Errorf(`ent: validator failed for field "APIKey.key_hash": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.KeyPrefix(); ok {
+		if err := apikey.KeyPrefixValidator(v); err != nil {
+			return &ValidationError{Name: "key_prefix", err: fmt.Errorf(`ent: validator failed for field "APIKey.key_prefix": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.KeyLastFour(); ok {
+		if err := apikey.KeyLastFourValidator(v); err != nil {
+			return &ValidationError{Name: "key_last_four", err: fmt.Errorf(`ent: validator failed for field "APIKey.key_last_four": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Name(); ok {
 		if err := apikey.NameValidator(v); err != nil {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "APIKey.name": %w`, err)}
@@ -589,6 +667,21 @@ func (_u *APIKeyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.Key(); ok {
 		_spec.SetField(apikey.FieldKey, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.KeyHash(); ok {
+		_spec.SetField(apikey.FieldKeyHash, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.KeyPrefix(); ok {
+		_spec.SetField(apikey.FieldKeyPrefix, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.KeyLastFour(); ok {
+		_spec.SetField(apikey.FieldKeyLastFour, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.KeyVersion(); ok {
+		_spec.SetField(apikey.FieldKeyVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedKeyVersion(); ok {
+		_spec.AddField(apikey.FieldKeyVersion, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(apikey.FieldName, field.TypeString, value)
@@ -870,6 +963,69 @@ func (_u *APIKeyUpdateOne) SetNillableKey(v *string) *APIKeyUpdateOne {
 	if v != nil {
 		_u.SetKey(*v)
 	}
+	return _u
+}
+
+// SetKeyHash sets the "key_hash" field.
+func (_u *APIKeyUpdateOne) SetKeyHash(v string) *APIKeyUpdateOne {
+	_u.mutation.SetKeyHash(v)
+	return _u
+}
+
+// SetNillableKeyHash sets the "key_hash" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableKeyHash(v *string) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetKeyHash(*v)
+	}
+	return _u
+}
+
+// SetKeyPrefix sets the "key_prefix" field.
+func (_u *APIKeyUpdateOne) SetKeyPrefix(v string) *APIKeyUpdateOne {
+	_u.mutation.SetKeyPrefix(v)
+	return _u
+}
+
+// SetNillableKeyPrefix sets the "key_prefix" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableKeyPrefix(v *string) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetKeyPrefix(*v)
+	}
+	return _u
+}
+
+// SetKeyLastFour sets the "key_last_four" field.
+func (_u *APIKeyUpdateOne) SetKeyLastFour(v string) *APIKeyUpdateOne {
+	_u.mutation.SetKeyLastFour(v)
+	return _u
+}
+
+// SetNillableKeyLastFour sets the "key_last_four" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableKeyLastFour(v *string) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetKeyLastFour(*v)
+	}
+	return _u
+}
+
+// SetKeyVersion sets the "key_version" field.
+func (_u *APIKeyUpdateOne) SetKeyVersion(v int) *APIKeyUpdateOne {
+	_u.mutation.ResetKeyVersion()
+	_u.mutation.SetKeyVersion(v)
+	return _u
+}
+
+// SetNillableKeyVersion sets the "key_version" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableKeyVersion(v *int) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetKeyVersion(*v)
+	}
+	return _u
+}
+
+// AddKeyVersion adds value to the "key_version" field.
+func (_u *APIKeyUpdateOne) AddKeyVersion(v int) *APIKeyUpdateOne {
+	_u.mutation.AddKeyVersion(v)
 	return _u
 }
 
@@ -1350,6 +1506,21 @@ func (_u *APIKeyUpdateOne) check() error {
 			return &ValidationError{Name: "key", err: fmt.Errorf(`ent: validator failed for field "APIKey.key": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.KeyHash(); ok {
+		if err := apikey.KeyHashValidator(v); err != nil {
+			return &ValidationError{Name: "key_hash", err: fmt.Errorf(`ent: validator failed for field "APIKey.key_hash": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.KeyPrefix(); ok {
+		if err := apikey.KeyPrefixValidator(v); err != nil {
+			return &ValidationError{Name: "key_prefix", err: fmt.Errorf(`ent: validator failed for field "APIKey.key_prefix": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.KeyLastFour(); ok {
+		if err := apikey.KeyLastFourValidator(v); err != nil {
+			return &ValidationError{Name: "key_last_four", err: fmt.Errorf(`ent: validator failed for field "APIKey.key_last_four": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Name(); ok {
 		if err := apikey.NameValidator(v); err != nil {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "APIKey.name": %w`, err)}
@@ -1406,6 +1577,21 @@ func (_u *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err erro
 	}
 	if value, ok := _u.mutation.Key(); ok {
 		_spec.SetField(apikey.FieldKey, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.KeyHash(); ok {
+		_spec.SetField(apikey.FieldKeyHash, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.KeyPrefix(); ok {
+		_spec.SetField(apikey.FieldKeyPrefix, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.KeyLastFour(); ok {
+		_spec.SetField(apikey.FieldKeyLastFour, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.KeyVersion(); ok {
+		_spec.SetField(apikey.FieldKeyVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedKeyVersion(); ok {
+		_spec.AddField(apikey.FieldKeyVersion, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(apikey.FieldName, field.TypeString, value)

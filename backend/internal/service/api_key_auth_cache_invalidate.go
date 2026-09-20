@@ -1,14 +1,34 @@
 package service
 
-import "context"
+import (
+	"context"
+	"time"
+
+	"github.com/Wei-Shaw/sub2api/internal/pkg/apikeyhmac"
+)
 
 // InvalidateAuthCacheByKey 清除指定 API Key 的认证缓存
 func (s *APIKeyService) InvalidateAuthCacheByKey(ctx context.Context, key string) {
 	if key == "" {
 		return
 	}
-	cacheKey := s.authCacheKey(key)
-	s.deleteAuthCache(ctx, cacheKey)
+	keyring, err := s.requireKeyring()
+	if err != nil {
+		return
+	}
+	for _, candidate := range keyring.Candidates(key, time.Now()) {
+		s.deleteAuthCache(ctx, candidate.Digest)
+	}
+}
+
+// InvalidateAuthCacheByDigest clears an internal HMAC-addressed cache entry.
+// It intentionally rejects non-digests so public raw credentials cannot be
+// confused with internal cache references.
+func (s *APIKeyService) InvalidateAuthCacheByDigest(ctx context.Context, keyHash string) {
+	if !apikeyhmac.IsDigest(keyHash) {
+		return
+	}
+	s.deleteAuthCache(ctx, keyHash)
 }
 
 // InvalidateAuthCacheByUserID 清除用户相关的 API Key 认证缓存
@@ -20,7 +40,7 @@ func (s *APIKeyService) InvalidateAuthCacheByUserID(ctx context.Context, userID 
 	if err != nil {
 		return
 	}
-	s.deleteAuthCacheByKeys(ctx, keys)
+	s.deleteAuthCacheByDigests(ctx, keys)
 }
 
 // InvalidateAuthCacheByGroupID 清除分组相关的 API Key 认证缓存
@@ -32,17 +52,14 @@ func (s *APIKeyService) InvalidateAuthCacheByGroupID(ctx context.Context, groupI
 	if err != nil {
 		return
 	}
-	s.deleteAuthCacheByKeys(ctx, keys)
+	s.deleteAuthCacheByDigests(ctx, keys)
 }
 
-func (s *APIKeyService) deleteAuthCacheByKeys(ctx context.Context, keys []string) {
-	if len(keys) == 0 {
+func (s *APIKeyService) deleteAuthCacheByDigests(ctx context.Context, keyHashes []string) {
+	if len(keyHashes) == 0 {
 		return
 	}
-	for _, key := range keys {
-		if key == "" {
-			continue
-		}
-		s.deleteAuthCache(ctx, s.authCacheKey(key))
+	for _, keyHash := range keyHashes {
+		s.InvalidateAuthCacheByDigest(ctx, keyHash)
 	}
 }

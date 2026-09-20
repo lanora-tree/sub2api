@@ -28,9 +28,15 @@ func IsWindowExpired(windowStart *time.Time, duration time.Duration) bool {
 }
 
 type APIKey struct {
-	ID          int64
-	UserID      int64
+	ID     int64
+	UserID int64
+	// Key is transient plaintext. It is populated only for a successful create
+	// response and for the lifetime of an authenticated request.
 	Key         string
+	KeyHash     string
+	KeyPrefix   string
+	KeyLastFour string
+	KeyVersion  int
 	Name        string
 	GroupID     *int64
 	Status      string

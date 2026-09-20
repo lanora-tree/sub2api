@@ -94,30 +94,8 @@
             <span class="font-mono text-xs text-gray-500 dark:text-gray-400">#{{ value }}</span>
           </template>
 
-          <template #cell-key="{ value, row }">
-            <div class="flex items-center gap-2">
-              <code class="code text-xs">
-                {{ maskApiKey(value) }}
-              </code>
-              <button
-                @click="copyToClipboard(value, row.id)"
-                class="rounded-lg p-1 transition-colors hover:bg-gray-100 dark:hover:bg-dark-700"
-                :class="
-                  copiedKeyId === row.id
-                    ? 'text-green-500'
-                    : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
-                "
-                :title="copiedKeyId === row.id ? t('keys.copied') : t('keys.copyToClipboard')"
-              >
-                <Icon
-                  v-if="copiedKeyId === row.id"
-                  name="check"
-                  size="sm"
-                  :stroke-width="2"
-                />
-                <Icon v-else name="clipboard" size="sm" />
-              </button>
-            </div>
+          <template #cell-masked_key="{ value }">
+            <code class="code text-xs">{{ value || t('keys.secretUnavailable') }}</code>
           </template>
 
           <template #cell-name="{ value, row }">
@@ -373,8 +351,10 @@
             <div class="flex items-center gap-1">
               <!-- Use Key Button -->
               <button
+                disabled
                 @click="openUseKeyModal(row)"
-                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-green-50 hover:text-green-600 dark:hover:bg-green-900/20 dark:hover:text-green-400"
+                class="flex cursor-not-allowed flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-300 dark:text-gray-600"
+                :title="t('keys.secretUnavailableHint')"
               >
                 <Icon name="terminal" size="sm" />
                 <span class="text-xs">{{ t('keys.useKey') }}</span>
@@ -382,8 +362,10 @@
               <!-- Import to CC Switch Button -->
               <button
                 v-if="!publicSettings?.hide_ccs_import_button"
+                disabled
                 @click="importToCcswitch(row)"
-                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/20 dark:hover:text-blue-400"
+                class="flex cursor-not-allowed flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-300 dark:text-gray-600"
+                :title="t('keys.secretUnavailableHint')"
               >
                 <Icon name="upload" size="sm" />
                 <span class="text-xs">{{ t('keys.importToCcSwitch') }}</span>
@@ -998,6 +980,44 @@
       @close="closeUseKeyModal"
     />
 
+    <!-- The plaintext credential exists only in the first create response. -->
+    <BaseDialog
+      :show="showCreatedSecretDialog"
+      :title="t('keys.createdSecret.title')"
+      width="wide"
+      :close-on-click-outside="false"
+      :close-on-escape="false"
+      :show-close-button="false"
+      @close="closeCreatedSecretDialog"
+    >
+      <div class="space-y-4">
+        <div class="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-100">
+          <p class="font-semibold">{{ t('keys.createdSecret.warningTitle') }}</p>
+          <p class="mt-1">{{ t('keys.createdSecret.warning') }}</p>
+        </div>
+        <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-dark-600 dark:bg-dark-900">
+          <div class="flex items-center gap-2">
+            <code data-testid="created-api-key-secret" class="min-w-0 flex-1 break-all font-mono text-sm text-gray-900 dark:text-white">
+              {{ createdSecret?.key }}
+            </code>
+            <button
+              type="button"
+              class="btn btn-primary shrink-0"
+              @click="createdSecret && copyToClipboard(createdSecret.key, createdSecret.id)"
+            >
+              <Icon :name="copiedKeyId === createdSecret?.id ? 'check' : 'clipboard'" size="sm" class="mr-2" />
+              {{ copiedKeyId === createdSecret?.id ? t('keys.copied') : t('keys.createdSecret.copy') }}
+            </button>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <button type="button" class="btn btn-primary" @click="closeCreatedSecretDialog">
+          {{ t('keys.createdSecret.saved') }}
+        </button>
+      </template>
+    </BaseDialog>
+
     <!-- CCS Client Selection Dialog for Antigravity -->
     <BaseDialog
       :show="showCcsClientSelect"
@@ -1117,34 +1137,33 @@
 </template>
 
 <script setup lang="ts">
-	import { ref, reactive, computed, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
-	import { useI18n } from 'vue-i18n'
-	import { useAppStore } from '@/stores/app'
-	import { useOnboardingStore } from '@/stores/onboarding'
-	import { useClipboard } from '@/composables/useClipboard'
+import { ref, reactive, computed, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useAppStore } from '@/stores/app'
+import { useOnboardingStore } from '@/stores/onboarding'
+import { useClipboard } from '@/composables/useClipboard'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 
 const { t } = useI18n()
 import { keysAPI, authAPI, usageAPI, userGroupsAPI } from '@/api'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
-	import DataTable from '@/components/common/DataTable.vue'
-	import Pagination from '@/components/common/Pagination.vue'
-	import BaseDialog from '@/components/common/BaseDialog.vue'
-	import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
-	import EmptyState from '@/components/common/EmptyState.vue'
-	import Select from '@/components/common/Select.vue'
-	import SearchInput from '@/components/common/SearchInput.vue'
-	import Icon from '@/components/icons/Icon.vue'
-	import UseKeyModal from '@/components/keys/UseKeyModal.vue'
-	import EndpointPopover from '@/components/keys/EndpointPopover.vue'
-	import GroupBadge from '@/components/common/GroupBadge.vue'
-	import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
-	import type { ApiKey, Group, PublicSettings, SubscriptionType, GroupPlatform, UpdateApiKeyRequest } from '@/types'
+import DataTable from '@/components/common/DataTable.vue'
+import Pagination from '@/components/common/Pagination.vue'
+import BaseDialog from '@/components/common/BaseDialog.vue'
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
+import EmptyState from '@/components/common/EmptyState.vue'
+import Select from '@/components/common/Select.vue'
+import SearchInput from '@/components/common/SearchInput.vue'
+import Icon from '@/components/icons/Icon.vue'
+import UseKeyModal from '@/components/keys/UseKeyModal.vue'
+import EndpointPopover from '@/components/keys/EndpointPopover.vue'
+import GroupBadge from '@/components/common/GroupBadge.vue'
+import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
+import type { ApiKey, Group, PublicSettings, SubscriptionType, GroupPlatform, UpdateApiKeyRequest } from '@/types'
 import type { Column } from '@/components/common/types'
 import type { BatchApiKeyUsageStats } from '@/api/usage'
 import { formatDateTime } from '@/utils/format'
-import { maskApiKey } from '@/utils/maskApiKey'
 import {
   buildCcSwitchImportDeeplink,
   type CcSwitchClientType
@@ -1178,7 +1197,7 @@ const { copyToClipboard: clipboardCopy } = useClipboard()
 const allColumns = computed<Column[]>(() => [
   { key: 'name', label: t('common.name'), sortable: true },
   { key: 'id', label: t('keys.id'), sortable: true },
-  { key: 'key', label: t('keys.apiKey'), sortable: false },
+  { key: 'masked_key', label: t('keys.apiKey'), sortable: false },
   { key: 'group', label: t('keys.group'), sortable: false },
   { key: 'current_concurrency', label: t('keys.currentConcurrency'), sortable: true },
   { key: 'usage', label: t('keys.usage'), sortable: false },
@@ -1195,7 +1214,7 @@ const ALWAYS_VISIBLE_COLUMNS = new Set(['name', 'actions'])
 const DEFAULT_HIDDEN_COLUMNS = ['id', 'rate_limit', 'last_used_at', 'last_used_ip']
 const HIDDEN_COLUMNS_KEY = 'api-key-hidden-columns'
 const COLUMN_SETTINGS_VERSION_KEY = 'api-key-column-settings-version'
-const COLUMN_SETTINGS_VERSION = 3
+const COLUMN_SETTINGS_VERSION = 4
 const VERSION_NEW_HIDDEN_COLUMNS: Record<number, string[]> = {
   2: ['last_used_ip'],
   3: ['id']
@@ -1300,6 +1319,8 @@ const showDeleteDialog = ref(false)
 const showResetQuotaDialog = ref(false)
 const showResetRateLimitDialog = ref(false)
 const showUseKeyModal = ref(false)
+const showCreatedSecretDialog = ref(false)
+const createdSecret = ref<ApiKey | null>(null)
 const showCcsClientSelect = ref(false)
 const showColumnDropdown = ref(false)
 const pendingCcsRow = ref<ApiKey | null>(null)
@@ -1736,7 +1757,7 @@ const handleSubmit = async () => {
       appStore.showSuccess(t('keys.keyUpdatedSuccess'))
     } else {
       const customKey = formData.value.use_custom_key ? formData.value.custom_key : undefined
-      await keysAPI.create(
+      const created = await keysAPI.create(
         formData.value.name,
         formData.value.group_id,
         customKey,
@@ -1746,7 +1767,13 @@ const handleSubmit = async () => {
         expiresInDays,
         rateLimitData
       )
-      appStore.showSuccess(t('keys.keyCreatedSuccess'))
+      if (!created.key) {
+        appStore.showError(t('keys.createdSecret.replayUnavailable'))
+      } else {
+        createdSecret.value = created
+        showCreatedSecretDialog.value = true
+        appStore.showSuccess(t('keys.keyCreatedSuccess'))
+      }
       // Only advance tour if active, on submit step, and creation succeeded
       if (onboardingStore.isCurrentStep('[data-tour="key-form-submit"]')) {
         onboardingStore.nextStep(500)
@@ -1761,6 +1788,12 @@ const handleSubmit = async () => {
   } finally {
     submitting.value = false
   }
+}
+
+const closeCreatedSecretDialog = () => {
+  showCreatedSecretDialog.value = false
+  createdSecret.value = null
+  copiedKeyId.value = null
 }
 
 /**

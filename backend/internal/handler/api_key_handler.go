@@ -217,12 +217,20 @@ func (h *APIKeyHandler) Create(c *gin.Context) {
 		svcReq.RateLimit7d = *req.RateLimit7d
 	}
 
-	executeUserIdempotentJSON(c, "user.api_keys.create", req, service.DefaultWriteIdempotencyTTL(), func(ctx context.Context) (any, error) {
+	executeUserIdempotentJSONWithStoredResponse(c, "user.api_keys.create", req, service.DefaultWriteIdempotencyTTL(), func(data any) any {
+		created, ok := data.(*dto.APIKey)
+		if !ok || created == nil {
+			return data
+		}
+		safe := *created
+		safe.Key = ""
+		return &safe
+	}, func(ctx context.Context) (any, error) {
 		key, err := h.apiKeyService.Create(ctx, subject.UserID, svcReq)
 		if err != nil {
 			return nil, err
 		}
-		return dto.APIKeyFromService(key), nil
+		return dto.APIKeyCreatedFromService(key), nil
 	})
 }
 

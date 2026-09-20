@@ -60,9 +60,14 @@ func (s *UserRepoAPIKeyGroupFilterSuite) mustCreateGroup(name string) *dbent.Gro
 
 func (s *UserRepoAPIKeyGroupFilterSuite) mustCreateAPIKey(userID int64, key, name string, groupID *int64) *dbent.APIKey {
 	s.T().Helper()
+	credential := withTestAPIKeyCredential(&service.APIKey{Key: key})
 	create := s.client.APIKey.Create().
 		SetUserID(userID).
-		SetKey(key).
+		SetKey("").
+		SetKeyHash(credential.KeyHash).
+		SetKeyPrefix(credential.KeyPrefix).
+		SetKeyLastFour(credential.KeyLastFour).
+		SetKeyVersion(credential.KeyVersion).
 		SetName(name)
 	if groupID != nil {
 		create = create.SetGroupID(*groupID)

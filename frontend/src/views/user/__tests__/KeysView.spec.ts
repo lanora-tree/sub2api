@@ -7,6 +7,7 @@ import KeysView from '../KeysView.vue'
 
 const {
   listKeys,
+  createKey,
   getPublicSettings,
   getDashboardApiKeysUsage,
   getAvailableGroups,
@@ -18,6 +19,7 @@ const {
   nextStep,
 } = vi.hoisted(() => ({
   listKeys: vi.fn(),
+  createKey: vi.fn(),
   getPublicSettings: vi.fn(),
   getDashboardApiKeysUsage: vi.fn(),
   getAvailableGroups: vi.fn(),
@@ -53,12 +55,17 @@ const messages: Record<string, string> = {
   'keys.status.inactive': 'Inactive',
   'keys.status.quota_exhausted': 'Quota exhausted',
   'keys.usage': 'Usage',
+  'keys.createdSecret.title': 'Save this Secret now',
+  'keys.createdSecret.warningTitle': 'Shown once',
+  'keys.createdSecret.warning': 'It cannot be recovered later.',
+  'keys.createdSecret.copy': 'Copy Secret',
+  'keys.createdSecret.saved': 'I saved it',
 }
 
 vi.mock('@/api', () => ({
   keysAPI: {
     list: listKeys,
-    create: vi.fn(),
+    create: createKey,
     update: vi.fn(),
     delete: vi.fn(),
     toggleStatus: vi.fn(),
@@ -109,6 +116,9 @@ const createApiKey = (): ApiKey => ({
   id: 1,
   user_id: 1,
   key: 'sk-test-key',
+  key_prefix: 'sk-test-',
+  key_last_four: '-key',
+  masked_key: 'sk-test-…-key',
   name: 'test-key',
   group_id: null,
   status: 'active',
@@ -170,6 +180,9 @@ const DataTableStub = {
           <slot name="cell-id" :value="row.id" :row="row" />
         </div>
         <slot name="cell-name" :value="row.name" :row="row" />
+        <div data-test="masked-key">
+          <slot name="cell-masked_key" :value="row.masked_key" :row="row" />
+        </div>
         <div data-test="current-concurrency">
           <slot name="cell-current_concurrency" :value="row.current_concurrency" :row="row" />
         </div>
@@ -215,6 +228,17 @@ const IconStub = {
   template: '<span data-test="icon">{{ name }}</span>',
 }
 
+const BaseDialogStub = {
+  name: 'BaseDialog',
+  props: ['show', 'title', 'closeOnClickOutside', 'closeOnEscape', 'showCloseButton'],
+  template: `
+    <section v-if="show" data-test="base-dialog" :data-title="title">
+      <slot />
+      <slot name="footer" />
+    </section>
+  `,
+}
+
 const mountView = async () => {
   const wrapper = mount(KeysView, {
     global: {
@@ -223,7 +247,7 @@ const mountView = async () => {
         TablePageLayout: TablePageLayoutStub,
         DataTable: DataTableStub,
         Pagination: PaginationStub,
-        BaseDialog: true,
+        BaseDialog: BaseDialogStub,
         ConfirmDialog: true,
         EmptyState: true,
         Select: SelectStub,
@@ -261,6 +285,7 @@ describe('user KeysView column settings', () => {
     localStorage.clear()
 
     listKeys.mockReset()
+    createKey.mockReset()
     getPublicSettings.mockReset()
     getDashboardApiKeysUsage.mockReset()
     getAvailableGroups.mockReset()
@@ -278,6 +303,7 @@ describe('user KeysView column settings', () => {
       page_size: 20,
       pages: 1,
     })
+    createKey.mockResolvedValue(createApiKey())
     getPublicSettings.mockResolvedValue({})
     getDashboardApiKeysUsage.mockResolvedValue({ stats: {} })
     getAvailableGroups.mockResolvedValue([])
@@ -290,7 +316,7 @@ describe('user KeysView column settings', () => {
 
     expect(visibleColumnKeys(wrapper)).toEqual([
       'name',
-      'key',
+      'masked_key',
       'group',
       'current_concurrency',
       'usage',
@@ -316,7 +342,7 @@ describe('user KeysView column settings', () => {
     expect(localStorage.getItem('api-key-hidden-columns')).toBe(
       JSON.stringify(['id', 'last_used_at', 'last_used_ip'])
     )
-    expect(localStorage.getItem('api-key-column-settings-version')).toBe('3')
+    expect(localStorage.getItem('api-key-column-settings-version')).toBe('4')
   })
 
   it('shows the API key ID column when toggled', async () => {
@@ -357,7 +383,7 @@ describe('user KeysView column settings', () => {
 
     expect(visibleColumnKeys(wrapper)).toEqual([
       'name',
-      'key',
+      'masked_key',
       'current_concurrency',
       'usage',
       'rate_limit',
@@ -369,7 +395,7 @@ describe('user KeysView column settings', () => {
     expect(localStorage.getItem('api-key-hidden-columns')).toBe(
       JSON.stringify(['group', 'created_at', 'last_used_ip', 'id'])
     )
-    expect(localStorage.getItem('api-key-column-settings-version')).toBe('3')
+    expect(localStorage.getItem('api-key-column-settings-version')).toBe('4')
   })
 
   it('does not include always-visible columns in the toggleable menu', async () => {
@@ -392,6 +418,34 @@ describe('user KeysView column settings', () => {
     const wrapper = await mountView()
 
     expect(wrapper.get('[data-test="current-concurrency"]').text()).toBe('3')
+  })
+
+  it('renders only the masked credential in the list', async () => {
+    const wrapper = await mountView()
+
+    expect(wrapper.get('[data-test="masked-key"]').text()).toBe('sk-test-…-key')
+    expect(wrapper.text()).not.toContain('sk-test-key')
+  })
+
+  it('shows the plaintext Secret only after a successful create', async () => {
+    const created = { ...createApiKey(), key: 'sk-one-time-secret-1234' }
+    createKey.mockResolvedValueOnce(created)
+    const wrapper = await mountView()
+
+    await getButtonByText(wrapper, 'Create API Key').trigger('click')
+    await nextTick()
+    await wrapper.get('#key-form input[required]').setValue('created-key')
+    await wrapper.get('#key-form select').setValue('42')
+    await wrapper.get('#key-form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="created-api-key-secret"]').text()).toBe(created.key)
+    expect(wrapper.text()).toContain('It cannot be recovered later.')
+    const secretDialog = wrapper.findAllComponents({ name: 'BaseDialog' })
+      .find(dialog => dialog.props('title') === 'Save this Secret now')
+    expect(secretDialog?.props('closeOnClickOutside')).toBe(false)
+    expect(secretDialog?.props('closeOnEscape')).toBe(false)
+    expect(secretDialog?.props('showCloseButton')).toBe(false)
   })
 
   it('marks current concurrency as sortable', async () => {

@@ -66,10 +66,10 @@ chmod +x docker-deploy.sh
 
 **What the script does:**
 - Downloads `docker-compose.local.yml` and `.env.example`
-- Automatically generates secure secrets (JWT_SECRET, TOTP_ENCRYPTION_KEY, POSTGRES_PASSWORD)
+- Automatically generates secure secrets (JWT_SECRET, TOTP_ENCRYPTION_KEY, API_KEY_HMAC_ACTIVE_PEPPER, POSTGRES_PASSWORD)
 - Creates `.env` file with generated secrets
 - Creates necessary data directories (data/, postgres_data/, redis_data/)
-- **Displays generated credentials** (POSTGRES_PASSWORD, JWT_SECRET, etc.)
+- **Displays selected generated credentials** (for example POSTGRES_PASSWORD and JWT_SECRET); the API Key HMAC Pepper is saved to `.env` but never printed
 
 **After running the script:**
 ```bash
@@ -103,8 +103,10 @@ nano .env  # Set POSTGRES_PASSWORD and other required variables
 # Generate secure secrets (recommended)
 JWT_SECRET=$(openssl rand -hex 32)
 TOTP_ENCRYPTION_KEY=$(openssl rand -hex 32)
+API_KEY_HMAC_ACTIVE_PEPPER=$(openssl rand -hex 32)
 echo "JWT_SECRET=${JWT_SECRET}" >> .env
 echo "TOTP_ENCRYPTION_KEY=${TOTP_ENCRYPTION_KEY}" >> .env
+echo "API_KEY_HMAC_ACTIVE_PEPPER=${API_KEY_HMAC_ACTIVE_PEPPER}" >> .env
 
 # Create data directories
 mkdir -p data postgres_data redis_data
@@ -173,6 +175,8 @@ database recovery period is not treated as a permanent process failure.
 - Migrations are applied in lexicographic order (e.g. `001_...sql`, `002_...sql`).
 - `schema_migrations` tracks applied migrations (filename + checksum).
 - Migrations are forward-only; rollback requires a DB backup restore or a manual compensating SQL script.
+- Migration `243_api_key_hmac.sql` is irreversible in place: it removes recoverable user API-key plaintext. Before upgrading, stop writes and take a database backup. Rollback requires restoring that backup together with the previous application image.
+- Keep `API_KEY_HMAC_ACTIVE_PEPPER` in the runtime secret store, outside the database backup. Losing it revokes existing keys. For rotation, deploy a new active version while setting exactly one previous version/Pepper and an explicit RFC3339 UTC cutoff; successful uses are progressively rehashed, and unmigrated previous-version keys are rejected after the cutoff.
 
 **Verify `users.allowed_groups` → `user_allowed_groups` backfill**
 
@@ -256,6 +260,9 @@ docker compose down -v
 | `POSTGRES_PASSWORD` | **Yes** | - | PostgreSQL password |
 | `JWT_SECRET` | **Recommended** | *(auto-generated)* | JWT secret (fixed for persistent sessions) |
 | `TOTP_ENCRYPTION_KEY` | **Recommended** | *(auto-generated)* | TOTP encryption key (fixed for persistent 2FA) |
+| `API_KEY_HMAC_ACTIVE_PEPPER` | **Yes** | *(auto-generated)* | HMAC Pepper for user API keys; keep outside PostgreSQL and backups |
+| `API_KEY_HMAC_ACTIVE_VERSION` | No | `1` | Positive version associated with the active Pepper |
+| `API_KEY_HMAC_PREVIOUS_*` | Rotation only | *(empty)* | One previous Pepper/version and an RFC3339 UTC cutoff; configure all three together |
 | `SERVER_PORT` | No | `8080` | Server port |
 | `ADMIN_EMAIL` | No | `admin@sub2api.local` | Admin email |
 | `ADMIN_PASSWORD` | No | *(auto-generated)* | Admin password |
@@ -268,7 +275,7 @@ docker compose down -v
 
 See `.env.example` for all available options.
 
-> **Note:** The `docker-deploy.sh` script automatically generates `JWT_SECRET`, `TOTP_ENCRYPTION_KEY`, and `POSTGRES_PASSWORD` for you.
+> **Note:** The `docker-deploy.sh` script automatically generates `JWT_SECRET`, `TOTP_ENCRYPTION_KEY`, `API_KEY_HMAC_ACTIVE_PEPPER`, and `POSTGRES_PASSWORD` for you. The HMAC Pepper is saved to `.env` but deliberately not printed.
 
 ### Easy Migration (Local Directory Version)
 

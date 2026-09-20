@@ -16,12 +16,12 @@ import (
 )
 
 func invalidAuthAbuseTestConfig(threshold int) *config.Config {
-	return &config.Config{
+	return testAPIKeyConfig(&config.Config{
 		RunMode: config.RunModeSimple,
 		APIKeyAuth: config.APIKeyAuthCacheConfig{InvalidAbuse: config.InvalidAuthAbuseConfig{
 			Enabled: true, Threshold: threshold, WindowSeconds: 60, BlockSeconds: 60, Capacity: 256,
 		}},
-	}
+	})
 }
 
 func TestAPIKeyAuthInvalidAbuseReturns429BeforeRepository(t *testing.T) {
@@ -98,9 +98,9 @@ func TestInvalidAuthAbuseDoesNotCountValidOrOperationalFailures(t *testing.T) {
 	user := &service.User{ID: 1, Status: service.StatusActive, Role: service.RoleUser, Balance: 1}
 	repo := &stubApiKeyRepo{getByKey: func(_ context.Context, key string) (*service.APIKey, error) {
 		switch key {
-		case "valid-key":
+		case testAPIKeyDigest("valid-key"):
 			return &service.APIKey{ID: 1, UserID: 1, Key: key, Status: service.StatusActive, User: user}, nil
-		case "db-error":
+		case testAPIKeyDigest("db-error"):
 			return nil, errors.New("database unavailable")
 		default:
 			return nil, service.ErrAPIKeyNotFound

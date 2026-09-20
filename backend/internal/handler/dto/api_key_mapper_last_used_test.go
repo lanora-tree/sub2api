@@ -15,6 +15,8 @@ func TestAPIKeyFromService_MapsLastUsedAt(t *testing.T) {
 		ID:                 1,
 		UserID:             2,
 		Key:                "sk-map-last-used",
+		KeyPrefix:          "sk-map-l",
+		KeyLastFour:        "used",
 		Name:               "Mapper",
 		Status:             service.StatusActive,
 		LastUsedAt:         &lastUsed,
@@ -29,6 +31,10 @@ func TestAPIKeyFromService_MapsLastUsedAt(t *testing.T) {
 	require.NotNil(t, out.LastUsedIP)
 	require.Equal(t, lastUsedIP, *out.LastUsedIP)
 	require.Equal(t, 3, out.CurrentConcurrency)
+	require.Empty(t, out.Key, "ordinary DTO mapper must never expose the transient secret")
+	require.Equal(t, "sk-map-l••••used", out.MaskedKey)
+	created := APIKeyCreatedFromService(src)
+	require.Equal(t, src.Key, created.Key)
 }
 
 func TestAPIKeyFromService_MapsNilLastUsedAt(t *testing.T) {

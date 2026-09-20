@@ -372,3 +372,27 @@ README_CN 另有以下项目声明：服务条款风险、仅供技术学习研�
 4. Composite detector 和账号模型 ownership 只是路由提示，不是授权身份。Gateway 因此只接受显式 exact Route；模型目录也直接使用权限 Route，而不是先暴露账号能力再让请求阶段拒绝。
 5. OpenAI Images 会在 handler 内把缺失 model 默认成 `gpt-image-2`。如果权限中间件只看原 body，会形成默认模型绕过；M6.3 已在中间件采用相同默认值再授权，并有回归测试。
 6. 当前 Route 仍只锁定 platform，同平台内的 Codex Subscription 与 Official API 成本池隔离尚未成立；这也是 M6.3 候选不切换稳定实例的主要原因之一。M6 后续仍需 `target_group_id`、only-explicit、API Key HMAC、credential 加密、usage 钱包结算和对账告警。
+
+## 24. M6.4 实施前复核
+
+1. 2026-09-14 复核 `upstream/main` 仍为 `bdb42e22f81fcb633ff0a060961211dd2bcb515b`，固定审计基线落后 399 个提交；upstream migration 最大编号 238，本分支最大编号 242，M6.4 使用新的 243 且不改写已发布 migration。
+2. API Key 明文目前同时存在于 `api_keys.key`、Service 实体、用户列表/详情 DTO 和创建幂等响应中；只修改数据库列不够，必须同时封闭缓存键、批量失效、DTO mapper、幂等持久化与 Frontend 列表复制路径。
+3. `deleted_api_key_audits` 已弃用且当前删除路径不写入，但其历史 `key` 列仍可能包含 Secret；migration 243 需要清空该列，不能把旧 Secret 迁移到新的审计结构。
+4. HMAC Pepper 不能存入同一个数据库，否则数据库快照泄漏时摘要保护失效。运行时必须由外部配置提供 active Pepper；previous Pepper 只在有明确截止时间的轮换窗口内可用。
+5. 清除 `api_keys.key` 是不可逆的数据语义变化。当前稳定 M2 仍按明文查询，因此 M6.4 migration/backfill 只能在隔离副本验证；正式升级需要先备份，应用与数据库必须成对回滚。
+
+## 25. M6.4 验收结论
+
+1. API Key 保护必须覆盖完整生命周期，而不只是把数据库查询改成 HMAC。最终实现同时封闭了创建幂等存储、列表/详情 DTO、Admin 选择器、Frontend 复制路径、认证缓存键、批量失效触发器、日志字段和删除审计历史。
+2. 创建接口的一次性 Secret 与幂等重放存在天然冲突：首次成功调用方需要得到 Secret，但服务端不能把 Secret 持久化后再次返回。当前方案允许首个内存响应携带 Secret，同时用 `StoredResponseTransform` 在落库前清空 `key`；相同幂等键重放只返回遮罩元数据。
+3. HMAC Pepper 轮换只保留 active 和一个 previous，并强制 previous 接受截止时间。previous 命中时渐进升级摘要；截止后未升级旧 Key 撤销，避免无限期保留多把 Pepper 扩大泄漏面。
+4. 数据库触发器不能再从已清空的 `api_keys.key` 派生缓存键。Migration 243 改为直接投递 `key_hash`，并由数据库校验 64 位小写十六进制，保证应用批量失效和数据库 outbox 使用同一种摘要身份。
+5. 隔离 PostgreSQL 与候选镜像黑盒确认：数据库明文为空，首次创建以外的 HTTP/幂等响应不含 Secret，重启后认证仍有效，缺少 Pepper 时应用在访问或修改业务数据前失败关闭。稳定 M2 数据库未升级。
+
+## 26. V1 人工调账与共享上游池决策
+
+1. V1 暂不建设 Internal Recharge API、支付回调或用户自助充值，M8 改为 `deferred`。这不会删除钱包模型：管理员仍通过 M6.2 的幂等钱包事务执行充值、正负调账与退款，所有变化保留 operator、备注和不可变流水。
+2. 运营后台不得直接设置 `users.balance`。即使 UI 采用“改余额”的表达，后端也必须提交有符号差额并在同一事务写入 `wallet_transactions`，否则会绕过审计、并发保护和对账。
+3. “共号”不表示共享本地账号、API Key 或上游 Secret。每个用户使用独立本地身份和 API Key，多个用户只是在路由层命中同一个 `target_group_id`，由该 Group 的上游账号池承载请求。
+4. Token、余额、usage、价格快照、账单与退款必须以认证用户和 API Key 独立归属。共享 Group 只影响上游调度，不能成为数据可见性或结算归属边界。
+5. M6.7 需要验证两个用户可同时命中同一 Group 且不能读取彼此数据；M7/M12 需要验证并发预留、实际 Token 结算、失败释放、退款和对账不串账。若共享的是个人订阅账号而非允许多租户使用的官方 API 账号，仍受 R1 合规门禁约束。

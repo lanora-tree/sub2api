@@ -2,8 +2,6 @@ package service
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -11,10 +9,11 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/apikeyhmac"
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 22 // v22: group free_openai_fast field
+const apiKeyAuthSnapshotVersion = 23 // v23: raw credentials are reconstructed with active HMAC metadata
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -192,8 +191,11 @@ func (s *APIKeyService) StopAuthCacheInvalidationSubscriber() {
 }
 
 func (s *APIKeyService) authCacheKey(key string) string {
-	sum := sha256.Sum256([]byte(key))
-	return hex.EncodeToString(sum[:])
+	keyring, err := s.requireKeyring()
+	if err != nil {
+		return ""
+	}
+	return keyring.Active(key).Digest
 }
 
 func (s *APIKeyService) getAuthCacheEntry(ctx context.Context, cacheKey string) (*APIKeyAuthCacheEntry, bool) {
@@ -267,7 +269,7 @@ func (s *APIKeyService) deleteAuthCache(ctx context.Context, cacheKey string) {
 }
 
 func (s *APIKeyService) loadAuthCacheEntry(ctx context.Context, key, cacheKey string) (*APIKeyAuthCacheEntry, error) {
-	apiKey, err := s.lookupAPIKeyForAuth(ctx, key)
+	apiKey, err := s.lookupAPIKeyByRawCredential(ctx, key)
 	if err != nil {
 		if errors.Is(err, ErrAPIKeyNotFound) {
 			entry := &APIKeyAuthCacheEntry{NotFound: true}
@@ -291,12 +293,12 @@ func (s *APIKeyService) loadAuthCacheEntry(ctx context.Context, key, cacheKey st
 	return entry, nil
 }
 
-func (s *APIKeyService) lookupAPIKeyForAuth(ctx context.Context, key string) (*APIKey, error) {
+func (s *APIKeyService) lookupAPIKeyHashForAuth(ctx context.Context, keyHash string) (*APIKey, error) {
 	if s == nil || s.apiKeyRepo == nil {
 		return nil, ErrAPIKeyNotFound
 	}
 	if s.authLookupSlots == nil {
-		return s.apiKeyRepo.GetByKeyForAuth(ctx, key)
+		return s.apiKeyRepo.GetByKeyForAuth(ctx, keyHash)
 	}
 	s.authLookupTotal.Add(1)
 	select {
@@ -312,7 +314,7 @@ func (s *APIKeyService) lookupAPIKeyForAuth(ctx context.Context, key string) (*A
 		s.authLookupRejected.Add(1)
 		return nil, ErrAPIKeyAuthOverloaded
 	}
-	return s.apiKeyRepo.GetByKeyForAuth(ctx, key)
+	return s.apiKeyRepo.GetByKeyForAuth(ctx, keyHash)
 }
 
 func (s *APIKeyService) applyAuthCacheEntry(key string, entry *APIKeyAuthCacheEntry) (*APIKey, bool, error) {
@@ -476,6 +478,12 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			RPMLimit:                   snapshot.User.RPMLimit,
 			UserGroupRPMOverride:       snapshot.User.UserGroupRPMOverride,
 		},
+	}
+	if s != nil && s.keyring != nil {
+		active := s.keyring.Active(key)
+		apiKey.KeyHash = active.Digest
+		apiKey.KeyVersion = active.Version
+		apiKey.KeyPrefix, apiKey.KeyLastFour = apikeyhmac.DisplayMetadata(key)
 	}
 	if snapshot.Group != nil {
 		apiKey.Group = &Group{

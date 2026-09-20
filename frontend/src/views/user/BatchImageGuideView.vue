@@ -562,6 +562,19 @@
             <p v-if="!loadingKeys && geminiApiKeys.length === 0" class="input-hint text-amber-600 dark:text-amber-400">
               {{ t('batchImage.create.noKeysHint') }}
             </p>
+            <div v-else-if="selectedApiKey" class="mt-3">
+              <label class="input-label">{{ batchImageText('apiKeySecret') }}</label>
+              <input
+                :value="selectedApiKey.key || ''"
+                type="password"
+                autocomplete="off"
+                class="input font-mono"
+                :placeholder="batchImageText('apiKeySecretPlaceholder')"
+                @input="setSelectedAPIKeySecret"
+                @change="handleSelectedAPIKeySecretChange"
+              />
+              <p class="input-hint text-amber-600 dark:text-amber-400">{{ batchImageText('apiKeySecretHint') }}</p>
+            </div>
           </div>
 
           <div>
@@ -1242,7 +1255,7 @@ async function loadApiKeys() {
   loadingKeys.value = true
   try {
     const response = await keysAPI.list(1, 100, { status: 'active', sort_by: 'created_at', sort_order: 'desc' })
-    apiKeys.value = response.items || []
+    apiKeys.value = (response.items || []).map(key => ({ ...key, key: key.key || '' }))
     if (!selectedApiKey.value && geminiApiKeys.value.length > 0) {
       form.apiKeyId = geminiApiKeys.value[0].id
     }
@@ -1267,6 +1280,10 @@ async function loadAvailableModels() {
   availableBatchImageModels.value = []
   form.model = ''
   if (!key) return
+  if (!key.key?.trim()) {
+    modelLoadError.value = batchImageText('apiKeySecretRequired')
+    return
+  }
 
   loadingModels.value = true
   try {
@@ -1495,7 +1512,7 @@ function copyPromptPopover() {
 }
 
 async function loadBatchJobs() {
-  const keys = filteredApiKeys.value
+  const keys = filteredApiKeys.value.filter(key => key.key?.trim())
   if (!keys.length) {
     batchJobs.value = []
     pagination.has_more = false
@@ -1594,16 +1611,34 @@ function keyForSelectedBatch(): ApiKey | null {
   return selectedApiKey.value
 }
 
-function requireApiKey(): ApiKey | null {
-  if (!selectedApiKey.value) {
+function requireAPIKeyCredential(key: ApiKey | null = selectedApiKey.value): ApiKey | null {
+  if (!key) {
     appStore.showError(batchImageText('selectApiKey'))
     return null
   }
-  return selectedApiKey.value
+  if (!key.key?.trim()) {
+    appStore.showError(batchImageText('apiKeySecretRequired'))
+    return null
+  }
+  return key
+}
+
+function setSelectedAPIKeySecret(event: Event) {
+  const key = selectedApiKey.value
+  if (!key) return
+  key.key = (event.target as HTMLInputElement).value
+  availableBatchImageModels.value = []
+  form.model = ''
+  modelLoadError.value = key.key.trim() ? '' : batchImageText('apiKeySecretRequired')
+}
+
+function handleSelectedAPIKeySecretChange() {
+  void loadAvailableModels()
+  void loadBatchJobs()
 }
 
 function validateForm(): boolean {
-  if (!requireApiKey()) return false
+  if (!requireAPIKeyCredential()) return false
   if (!form.model) {
     appStore.showError(availableBatchImageModels.value.length === 0 ? batchImageText('noModelsForKey') : batchImageText('selectModel'))
     return false
@@ -1628,31 +1663,31 @@ async function submitJob() {
   if (submitting.value) return
   if (promptDraft.value.trim()) addPromptRow()
   if (!validateForm()) return
-  const key = requireApiKey()
+  const key = requireAPIKeyCredential()
   if (!key) return
-	  submitting.value = true
-	  try {
-	    const job = await submitBatchImageJob(
-	      key.key,
-	      {
-	        model: form.model,
+  submitting.value = true
+  try {
+    const job = await submitBatchImageJob(
+      key.key,
+      {
+        model: form.model,
         task_name: form.taskName.trim() || defaultTaskName(),
         image_size: '1K',
         response_mime_type: form.responseMimeType,
         items: parsedItems.value,
-	      },
-	      `sub2api-ui-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
-	    )
-	    currentJob.value = job
-	    selectedBatchId.value = job.id
-	    selectedBatchApiKeyId.value = key.id
-	    items.value = []
-	    upsertJob(job)
-	    showCreateModal.value = false
-	    resetCreateDraft()
-	    appStore.showSuccess(batchImageText('submitted'))
-	    void loadItems()
-	    startPolling()
+      },
+      `sub2api-ui-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+    )
+    currentJob.value = job
+    selectedBatchId.value = job.id
+    selectedBatchApiKeyId.value = key.id
+    items.value = []
+    upsertJob(job)
+    showCreateModal.value = false
+    resetCreateDraft()
+    appStore.showSuccess(batchImageText('submitted'))
+    void loadItems()
+    startPolling()
   } catch (error: any) {
     appStore.showError(batchImageErrorMessage(error, batchImageText('submitFailed')))
   } finally {
@@ -1662,7 +1697,7 @@ async function submitJob() {
 
 async function refreshSelected() {
   if (!selectedBatchId.value) return
-  const key = keyForSelectedBatch() || requireApiKey()
+  const key = requireAPIKeyCredential(keyForSelectedBatch())
   if (!key) return
   refreshing.value = true
   try {
@@ -1769,7 +1804,7 @@ function canDeleteRecord(job: Pick<BatchImageJob, 'status'>) {
 
 async function cancelSelected() {
   if (!currentJob.value) return
-  const key = keyForSelectedBatch() || requireApiKey()
+  const key = requireAPIKeyCredential(keyForSelectedBatch())
   if (!key) return
   if (!window.confirm(batchImageText('cancelConfirm'))) return
   cancelling.value = true
@@ -1798,7 +1833,7 @@ async function retrySelected() {
 async function retryFailedJob(job: BatchImageJobRow | BatchImageJob) {
   if (!canRetry(job) || retryingBatchId.value) return
   closeMoreMenu()
-  const key = apiKeyForJob(job) || keyForSelectedBatch() || requireApiKey()
+  const key = requireAPIKeyCredential(apiKeyForJob(job) || keyForSelectedBatch())
   if (!key) return
   retryingBatchId.value = job.id
   try {
@@ -1863,7 +1898,7 @@ async function downloadJob(job: (BatchImageJobRow | Pick<BatchImageJob, 'id'>)) 
   if (downloading.value) return
   closeMoreMenu()
   applyJobApiKey(job)
-  const key = apiKeyForJob(job) || requireApiKey()
+  const key = requireAPIKeyCredential(apiKeyForJob(job))
   if (!key) return
   downloading.value = true
   downloadingBatchId.value = job.id
@@ -2190,7 +2225,7 @@ async function loadPreviewImageSource(blob: Blob): Promise<{ image: PreviewImage
 async function loadItems() {
   const batchId = selectedBatchId.value || currentJob.value?.id || ''
   if (!batchId) return
-  const key = keyForSelectedBatch() || requireApiKey()
+  const key = requireAPIKeyCredential(keyForSelectedBatch())
   if (!key) return
   loadingItems.value = true
   try {
@@ -2232,7 +2267,7 @@ async function loadItemPreview(item: BatchImageItem) {
   const batchId = item.batch_id || selectedBatchId.value || currentJob.value?.id || ''
   const previewKey = itemPreviewKey(item)
   if (!batchId || !canLoadItemPreview(item) || (itemPreviewUrls[previewKey] && !previewErrorIds.value.has(previewKey))) return
-  const key = keyForSelectedBatch() || requireApiKey()
+  const key = requireAPIKeyCredential(keyForSelectedBatch())
   if (!key) return
   const cacheKey = previewCacheKey(batchId, item.custom_id, 0)
   previewLoadingIds.value = new Set([...previewLoadingIds.value, previewKey])
@@ -2404,6 +2439,10 @@ type BatchImageTextKey =
   | 'loadModelsFailed'
   | 'loadJobsFailed'
   | 'selectApiKey'
+  | 'apiKeySecret'
+  | 'apiKeySecretPlaceholder'
+  | 'apiKeySecretHint'
+  | 'apiKeySecretRequired'
   | 'noModelsForKey'
   | 'selectModel'
   | 'promptRequired'

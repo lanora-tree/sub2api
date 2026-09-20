@@ -715,6 +715,9 @@ export interface ApiKey {
   id: number
   user_id: number
   key: string
+  key_prefix: string
+  key_last_four: string
+  masked_key: string
   name: string
   group_id: number | null
   status: 'active' | 'inactive' | 'quota_exhausted' | 'expired'

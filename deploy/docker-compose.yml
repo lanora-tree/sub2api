@@ -96,6 +96,13 @@ services:
       - JWT_SECRET=${JWT_SECRET:-}
       - JWT_EXPIRE_HOUR=${JWT_EXPIRE_HOUR:-24}
 
+      # User API Key HMAC (active Pepper is required)
+      - API_KEY_HMAC_ACTIVE_VERSION=${API_KEY_HMAC_ACTIVE_VERSION:-1}
+      - API_KEY_HMAC_ACTIVE_PEPPER=${API_KEY_HMAC_ACTIVE_PEPPER:?API_KEY_HMAC_ACTIVE_PEPPER is required}
+      - API_KEY_HMAC_PREVIOUS_VERSION=${API_KEY_HMAC_PREVIOUS_VERSION:-0}
+      - API_KEY_HMAC_PREVIOUS_PEPPER=${API_KEY_HMAC_PREVIOUS_PEPPER:-}
+      - API_KEY_HMAC_PREVIOUS_ACCEPT_UNTIL=${API_KEY_HMAC_PREVIOUS_ACCEPT_UNTIL:-}
+
       # =======================================================================
       # Setup Configuration
       # =======================================================================
