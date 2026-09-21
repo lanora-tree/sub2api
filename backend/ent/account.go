@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/proxy"
+	"github.com/google/uuid"
 )
 
 // Account is the model entity for the Account schema.
@@ -33,8 +34,22 @@ type Account struct {
 	Platform string `json:"platform,omitempty"`
 	// Type holds the value of the "type" field.
 	Type string `json:"type,omitempty"`
-	// Credentials holds the value of the "credentials" field.
+	// Deprecated plaintext credential document; must remain empty
 	Credentials map[string]interface{} `json:"credentials,omitempty"`
+	// Versioned AES-256-GCM ciphertext for the complete credential document
+	CredentialsEncrypted string `json:"credentials_encrypted,omitempty"`
+	// Runtime account-credential encryption key version
+	CredentialsKeyVersion int `json:"credentials_key_version,omitempty"`
+	// Stable per-account UUID authenticated as credential AAD
+	CredentialsAadID uuid.UUID `json:"credentials_aad_id,omitempty"`
+	// Keyed fingerprint used for credential compare-and-swap
+	CredentialsFingerprint string `json:"credentials_fingerprint,omitempty"`
+	// Keyed lookup digest for credential api_key; empty when absent
+	CredentialsAPIKeyDigest string `json:"credentials_api_key_digest,omitempty"`
+	// Non-secret presence flag used by refresh candidate queries
+	CredentialsHasRefreshToken bool `json:"credentials_has_refresh_token,omitempty"`
+	// Allowlisted non-secret credential metadata for database filters
+	CredentialsMeta map[string]interface{} `json:"credentials_meta,omitempty"`
 	// Extra holds the value of the "extra" field.
 	Extra map[string]interface{} `json:"extra,omitempty"`
 	// ProxyID holds the value of the "proxy_id" field.
@@ -169,18 +184,20 @@ func (*Account) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case account.FieldCredentials, account.FieldExtra:
+		case account.FieldCredentials, account.FieldCredentialsMeta, account.FieldExtra:
 			values[i] = new([]byte)
-		case account.FieldAutoPauseOnExpired, account.FieldSchedulable:
+		case account.FieldCredentialsHasRefreshToken, account.FieldAutoPauseOnExpired, account.FieldSchedulable:
 			values[i] = new(sql.NullBool)
 		case account.FieldRateMultiplier:
 			values[i] = new(sql.NullFloat64)
-		case account.FieldID, account.FieldProxyID, account.FieldProxyFallbackOriginID, account.FieldConcurrency, account.FieldLoadFactor, account.FieldPriority, account.FieldParentAccountID:
+		case account.FieldID, account.FieldCredentialsKeyVersion, account.FieldProxyID, account.FieldProxyFallbackOriginID, account.FieldConcurrency, account.FieldLoadFactor, account.FieldPriority, account.FieldParentAccountID:
 			values[i] = new(sql.NullInt64)
-		case account.FieldName, account.FieldNotes, account.FieldPlatform, account.FieldType, account.FieldStatus, account.FieldErrorMessage, account.FieldTempUnschedulableReason, account.FieldSessionWindowStatus, account.FieldQuotaDimension:
+		case account.FieldName, account.FieldNotes, account.FieldPlatform, account.FieldType, account.FieldCredentialsEncrypted, account.FieldCredentialsFingerprint, account.FieldCredentialsAPIKeyDigest, account.FieldStatus, account.FieldErrorMessage, account.FieldTempUnschedulableReason, account.FieldSessionWindowStatus, account.FieldQuotaDimension:
 			values[i] = new(sql.NullString)
 		case account.FieldCreatedAt, account.FieldUpdatedAt, account.FieldDeletedAt, account.FieldLastUsedAt, account.FieldExpiresAt, account.FieldRateLimitedAt, account.FieldRateLimitResetAt, account.FieldOverloadUntil, account.FieldTempUnschedulableUntil, account.FieldSessionWindowStart, account.FieldSessionWindowEnd:
 			values[i] = new(sql.NullTime)
+		case account.FieldCredentialsAadID:
+			values[i] = new(uuid.UUID)
 		default:
 			values[i] = new(sql.UnknownType)
 		}
@@ -252,6 +269,50 @@ func (_m *Account) assignValues(columns []string, values []any) error {
 			} else if value != nil && len(*value) > 0 {
 				if err := json.Unmarshal(*value, &_m.Credentials); err != nil {
 					return fmt.Errorf("unmarshal field credentials: %w", err)
+				}
+			}
+		case account.FieldCredentialsEncrypted:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field credentials_encrypted", values[i])
+			} else if value.Valid {
+				_m.CredentialsEncrypted = value.String
+			}
+		case account.FieldCredentialsKeyVersion:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field credentials_key_version", values[i])
+			} else if value.Valid {
+				_m.CredentialsKeyVersion = int(value.Int64)
+			}
+		case account.FieldCredentialsAadID:
+			if value, ok := values[i].(*uuid.UUID); !ok {
+				return fmt.Errorf("unexpected type %T for field credentials_aad_id", values[i])
+			} else if value != nil {
+				_m.CredentialsAadID = *value
+			}
+		case account.FieldCredentialsFingerprint:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field credentials_fingerprint", values[i])
+			} else if value.Valid {
+				_m.CredentialsFingerprint = value.String
+			}
+		case account.FieldCredentialsAPIKeyDigest:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field credentials_api_key_digest", values[i])
+			} else if value.Valid {
+				_m.CredentialsAPIKeyDigest = value.String
+			}
+		case account.FieldCredentialsHasRefreshToken:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field credentials_has_refresh_token", values[i])
+			} else if value.Valid {
+				_m.CredentialsHasRefreshToken = value.Bool
+			}
+		case account.FieldCredentialsMeta:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field credentials_meta", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.CredentialsMeta); err != nil {
+					return fmt.Errorf("unmarshal field credentials_meta: %w", err)
 				}
 			}
 		case account.FieldExtra:
@@ -502,6 +563,27 @@ func (_m *Account) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("credentials=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Credentials))
+	builder.WriteString(", ")
+	builder.WriteString("credentials_encrypted=")
+	builder.WriteString(_m.CredentialsEncrypted)
+	builder.WriteString(", ")
+	builder.WriteString("credentials_key_version=")
+	builder.WriteString(fmt.Sprintf("%v", _m.CredentialsKeyVersion))
+	builder.WriteString(", ")
+	builder.WriteString("credentials_aad_id=")
+	builder.WriteString(fmt.Sprintf("%v", _m.CredentialsAadID))
+	builder.WriteString(", ")
+	builder.WriteString("credentials_fingerprint=")
+	builder.WriteString(_m.CredentialsFingerprint)
+	builder.WriteString(", ")
+	builder.WriteString("credentials_api_key_digest=")
+	builder.WriteString(_m.CredentialsAPIKeyDigest)
+	builder.WriteString(", ")
+	builder.WriteString("credentials_has_refresh_token=")
+	builder.WriteString(fmt.Sprintf("%v", _m.CredentialsHasRefreshToken))
+	builder.WriteString(", ")
+	builder.WriteString("credentials_meta=")
+	builder.WriteString(fmt.Sprintf("%v", _m.CredentialsMeta))
 	builder.WriteString(", ")
 	builder.WriteString("extra=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Extra))

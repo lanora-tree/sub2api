@@ -88,6 +88,13 @@ services:
       - API_KEY_HMAC_PREVIOUS_PEPPER=${API_KEY_HMAC_PREVIOUS_PEPPER:-}
       - API_KEY_HMAC_PREVIOUS_ACCEPT_UNTIL=${API_KEY_HMAC_PREVIOUS_ACCEPT_UNTIL:-}
 
+      # Upstream account credential encryption (active key is required)
+      - ACCOUNT_CREDENTIALS_ACTIVE_VERSION=${ACCOUNT_CREDENTIALS_ACTIVE_VERSION:-1}
+      - ACCOUNT_CREDENTIALS_ACTIVE_KEY=${ACCOUNT_CREDENTIALS_ACTIVE_KEY:?ACCOUNT_CREDENTIALS_ACTIVE_KEY is required}
+      - ACCOUNT_CREDENTIALS_PREVIOUS_VERSION=${ACCOUNT_CREDENTIALS_PREVIOUS_VERSION:-0}
+      - ACCOUNT_CREDENTIALS_PREVIOUS_KEY=${ACCOUNT_CREDENTIALS_PREVIOUS_KEY:-}
+      - ACCOUNT_CREDENTIALS_PREVIOUS_ACCEPT_UNTIL=${ACCOUNT_CREDENTIALS_PREVIOUS_ACCEPT_UNTIL:-}
+
       # =======================================================================
       # Setup Configuration
       # =======================================================================

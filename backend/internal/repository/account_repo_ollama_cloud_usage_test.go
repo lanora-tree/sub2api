@@ -186,6 +186,30 @@ func TestListOllamaCloudUsageGroupAccountsUsesOneStrictBatchQuery(t *testing.T) 
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestListOllamaCloudUsageGroupAccountsUsesEncryptedLookup(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	var capturedSQL string
+	mock.ExpectQuery("SELECT id").
+		WithArgs(sqlmock.AnyArg()).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}))
+	store := testAccountCredentialStore(t)
+	repo := newAccountRepositoryWithSQL(nil, captureQuerySQL{db: db, captured: &capturedSQL}, nil, store.keyring)
+
+	accounts, err := repo.ListOllamaCloudUsageGroupAccounts(context.Background(), []*service.Account{
+		ollamaCloudUsageRepositoryAccount(),
+	})
+
+	require.NoError(t, err)
+	require.Empty(t, accounts)
+	query := normalizeSQLWhitespace(capturedSQL)
+	require.Contains(t, query, "credentials_api_key_digest = ANY($1)")
+	require.Contains(t, query, ollamaCloudBaseURLMatchesSQL("credentials_meta ->> 'base_url'"))
+	require.NotContains(t, query, "credentials ->> 'api_key'")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestListDueOllamaCloudUsageAccountsFiltersOrdersAndLimits(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)

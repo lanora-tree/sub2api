@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
+	"github.com/google/uuid"
 )
 
 // Account 定义 AI API 账户实体的 schema。
@@ -71,14 +72,39 @@ func (Account) Fields() []ent.Field {
 			MaxLen(20).
 			NotEmpty(),
 
-		// credentials: 认证凭证，以 JSONB 格式存储
-		// 结构取决于 type 字段：
-		// - api_key: {"api_key": "sk-xxx"}
-		// - oauth: {"access_token": "...", "refresh_token": "...", "expires_at": "..."}
-		// - cookie: {"session_key": "..."}
+		// credentials is the deprecated plaintext compatibility column. M6.5
+		// startup backfill encrypts every document and then keeps this object empty.
 		field.JSON("credentials", map[string]any{}).
 			Default(func() map[string]any { return map[string]any{} }).
-			SchemaType(map[string]string{dialect.Postgres: "jsonb"}),
+			SchemaType(map[string]string{dialect.Postgres: "jsonb"}).
+			Comment("Deprecated plaintext credential document; must remain empty"),
+		field.String("credentials_encrypted").
+			Default("").
+			SchemaType(map[string]string{dialect.Postgres: "text"}).
+			Comment("Versioned AES-256-GCM ciphertext for the complete credential document"),
+		field.Int("credentials_key_version").
+			Default(0).
+			NonNegative().
+			SchemaType(map[string]string{dialect.Postgres: "smallint"}).
+			Comment("Runtime account-credential encryption key version"),
+		field.UUID("credentials_aad_id", uuid.UUID{}).
+			Default(uuid.New).
+			Comment("Stable per-account UUID authenticated as credential AAD"),
+		field.String("credentials_fingerprint").
+			Default("").
+			MaxLen(64).
+			Comment("Keyed fingerprint used for credential compare-and-swap"),
+		field.String("credentials_api_key_digest").
+			Default("").
+			MaxLen(64).
+			Comment("Keyed lookup digest for credential api_key; empty when absent"),
+		field.Bool("credentials_has_refresh_token").
+			Default(false).
+			Comment("Non-secret presence flag used by refresh candidate queries"),
+		field.JSON("credentials_meta", map[string]any{}).
+			Default(func() map[string]any { return map[string]any{} }).
+			SchemaType(map[string]string{dialect.Postgres: "jsonb"}).
+			Comment("Allowlisted non-secret credential metadata for database filters"),
 
 		// extra: 扩展数据，存储平台特定的额外信息
 		// 如 CRS 账户的 crs_account_id、组织信息等

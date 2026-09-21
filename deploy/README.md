@@ -66,10 +66,10 @@ chmod +x docker-deploy.sh
 
 **What the script does:**
 - Downloads `docker-compose.local.yml` and `.env.example`
-- Automatically generates secure secrets (JWT_SECRET, TOTP_ENCRYPTION_KEY, API_KEY_HMAC_ACTIVE_PEPPER, POSTGRES_PASSWORD)
+- Automatically generates secure secrets (JWT_SECRET, TOTP_ENCRYPTION_KEY, API_KEY_HMAC_ACTIVE_PEPPER, ACCOUNT_CREDENTIALS_ACTIVE_KEY, POSTGRES_PASSWORD)
 - Creates `.env` file with generated secrets
 - Creates necessary data directories (data/, postgres_data/, redis_data/)
-- **Displays selected generated credentials** (for example POSTGRES_PASSWORD and JWT_SECRET); the API Key HMAC Pepper is saved to `.env` but never printed
+- **Displays selected generated credentials** (for example POSTGRES_PASSWORD and JWT_SECRET); API-key and account-credential keys are saved to `.env` but never printed
 
 **After running the script:**
 ```bash
@@ -104,9 +104,11 @@ nano .env  # Set POSTGRES_PASSWORD and other required variables
 JWT_SECRET=$(openssl rand -hex 32)
 TOTP_ENCRYPTION_KEY=$(openssl rand -hex 32)
 API_KEY_HMAC_ACTIVE_PEPPER=$(openssl rand -hex 32)
+ACCOUNT_CREDENTIALS_ACTIVE_KEY=$(openssl rand -hex 32)
 echo "JWT_SECRET=${JWT_SECRET}" >> .env
 echo "TOTP_ENCRYPTION_KEY=${TOTP_ENCRYPTION_KEY}" >> .env
 echo "API_KEY_HMAC_ACTIVE_PEPPER=${API_KEY_HMAC_ACTIVE_PEPPER}" >> .env
+echo "ACCOUNT_CREDENTIALS_ACTIVE_KEY=${ACCOUNT_CREDENTIALS_ACTIVE_KEY}" >> .env
 
 # Create data directories
 mkdir -p data postgres_data redis_data
@@ -177,6 +179,7 @@ database recovery period is not treated as a permanent process failure.
 - Migrations are forward-only; rollback requires a DB backup restore or a manual compensating SQL script.
 - Migration `243_api_key_hmac.sql` is irreversible in place: it removes recoverable user API-key plaintext. Before upgrading, stop writes and take a database backup. Rollback requires restoring that backup together with the previous application image.
 - Keep `API_KEY_HMAC_ACTIVE_PEPPER` in the runtime secret store, outside the database backup. Losing it revokes existing keys. For rotation, deploy a new active version while setting exactly one previous version/Pepper and an explicit RFC3339 UTC cutoff; successful uses are progressively rehashed, and unmigrated previous-version keys are rejected after the cutoff.
+- Migration `244_account_credentials_encryption.sql` encrypts complete upstream credential documents and clears the legacy JSONB plaintext during application startup. Keep `ACCOUNT_CREDENTIALS_ACTIVE_KEY` outside database backups; rollback requires the pre-upgrade database backup, previous image and previous key.
 
 **Verify `users.allowed_groups` → `user_allowed_groups` backfill**
 
@@ -263,6 +266,9 @@ docker compose down -v
 | `API_KEY_HMAC_ACTIVE_PEPPER` | **Yes** | *(auto-generated)* | HMAC Pepper for user API keys; keep outside PostgreSQL and backups |
 | `API_KEY_HMAC_ACTIVE_VERSION` | No | `1` | Positive version associated with the active Pepper |
 | `API_KEY_HMAC_PREVIOUS_*` | Rotation only | *(empty)* | One previous Pepper/version and an RFC3339 UTC cutoff; configure all three together |
+| `ACCOUNT_CREDENTIALS_ACTIVE_KEY` | **Yes** | *(auto-generated)* | Independent AES-256-GCM key for upstream account credentials; keep outside PostgreSQL and backups |
+| `ACCOUNT_CREDENTIALS_ACTIVE_VERSION` | No | `1` | Positive version associated with the active account-credential key |
+| `ACCOUNT_CREDENTIALS_PREVIOUS_*` | Rotation only | *(empty)* | One previous key/version and an RFC3339 UTC cutoff; configure all three together |
 | `SERVER_PORT` | No | `8080` | Server port |
 | `ADMIN_EMAIL` | No | `admin@sub2api.local` | Admin email |
 | `ADMIN_PASSWORD` | No | *(auto-generated)* | Admin password |
@@ -275,7 +281,7 @@ docker compose down -v
 
 See `.env.example` for all available options.
 
-> **Note:** The `docker-deploy.sh` script automatically generates `JWT_SECRET`, `TOTP_ENCRYPTION_KEY`, `API_KEY_HMAC_ACTIVE_PEPPER`, and `POSTGRES_PASSWORD` for you. The HMAC Pepper is saved to `.env` but deliberately not printed.
+> **Note:** The `docker-deploy.sh` script automatically generates `JWT_SECRET`, `TOTP_ENCRYPTION_KEY`, `API_KEY_HMAC_ACTIVE_PEPPER`, `ACCOUNT_CREDENTIALS_ACTIVE_KEY`, and `POSTGRES_PASSWORD` for you. The HMAC Pepper and credential key are saved to `.env` but deliberately not printed.
 
 ### Easy Migration (Local Directory Version)
 

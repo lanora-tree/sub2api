@@ -678,6 +678,20 @@ api_key_hmac:
   previous_accept_until: "" # RFC3339 UTC, e.g. 2026-10-01T00:00:00Z
 
 # =============================================================================
+# Upstream Account Credential Encryption (required)
+# 上游账号凭据加密配置（必填）
+# =============================================================================
+account_credentials:
+  # Independent 32-byte AES-256-GCM master key, hex encoded. Keep it outside
+  # PostgreSQL and backups; prefer ACCOUNT_CREDENTIALS_ACTIVE_* environment variables.
+  active_version: 1
+  active_key: ""
+  # Optional bounded rotation window; configure all fields together.
+  previous_version: 0
+  previous_key: ""
+  previous_accept_until: "" # RFC3339 UTC, e.g. 2026-10-01T00:00:00Z
+
+# =============================================================================
 # API Key Auth Cache Configuration
 # API Key 认证缓存配置
 # =============================================================================

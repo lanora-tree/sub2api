@@ -113,6 +113,12 @@ func InitEnt(cfg *config.Config) (*ent.Client, *sql.DB, error) {
 	if err := cfg.ValidateAPIKeyHMACForRuntime(); err != nil {
 		return nil, nil, fmt.Errorf("validate API key HMAC config: %w", err)
 	}
+	// Account credential encryption is also mandatory before migration 244 can
+	// be applied; otherwise a deployment could clear plaintext without having a
+	// usable independent decryption key.
+	if err := cfg.ValidateAccountCredentialsForRuntime(); err != nil {
+		return nil, nil, fmt.Errorf("validate account credential config: %w", err)
+	}
 
 	// 构建包含时区信息的数据库连接字符串 (DSN)。
 	// 时区信息会传递给 PostgreSQL，确保数据库层面的时间处理正确。
@@ -163,6 +169,10 @@ func InitEnt(cfg *config.Config) (*ent.Client, *sql.DB, error) {
 		return nil, nil, fmt.Errorf("validate config after secret bootstrap: %w", err)
 	}
 	if err := migrateAPIKeyCredentials(migrationCtx, drv.DB(), cfg, time.Now()); err != nil {
+		_ = client.Close()
+		return nil, nil, err
+	}
+	if err := migrateAccountCredentials(migrationCtx, drv.DB(), cfg, time.Now()); err != nil {
 		_ = client.Close()
 		return nil, nil, err
 	}

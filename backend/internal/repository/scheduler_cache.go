@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/accountcredential"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/redis/go-redis/v9"
 )
@@ -223,24 +224,29 @@ type schedulerCache struct {
 	rdb            *redis.Client
 	mgetChunkSize  int
 	writeChunkSize int
+	keyring        *accountcredential.Keyring
 }
 
-func NewSchedulerCache(rdb *redis.Client) service.SchedulerCache {
-	return newSchedulerCacheWithChunkSizes(rdb, defaultSchedulerSnapshotMGetChunkSize, defaultSchedulerSnapshotWriteChunkSize)
+func NewSchedulerCache(rdb *redis.Client, keyrings ...*accountcredential.Keyring) service.SchedulerCache {
+	return newSchedulerCacheWithChunkSizes(rdb, defaultSchedulerSnapshotMGetChunkSize, defaultSchedulerSnapshotWriteChunkSize, keyrings...)
 }
 
-func newSchedulerCacheWithChunkSizes(rdb *redis.Client, mgetChunkSize, writeChunkSize int) service.SchedulerCache {
+func newSchedulerCacheWithChunkSizes(rdb *redis.Client, mgetChunkSize, writeChunkSize int, keyrings ...*accountcredential.Keyring) service.SchedulerCache {
 	if mgetChunkSize <= 0 {
 		mgetChunkSize = defaultSchedulerSnapshotMGetChunkSize
 	}
 	if writeChunkSize <= 0 {
 		writeChunkSize = defaultSchedulerSnapshotWriteChunkSize
 	}
-	return &schedulerCache{
+	cache := &schedulerCache{
 		rdb:            rdb,
 		mgetChunkSize:  mgetChunkSize,
 		writeChunkSize: writeChunkSize,
 	}
+	if len(keyrings) > 0 {
+		cache.keyring = keyrings[0]
+	}
+	return cache
 }
 
 func (c *schedulerCache) GetSnapshot(ctx context.Context, bucket service.SchedulerBucket) ([]*service.Account, bool, error) {
@@ -296,7 +302,11 @@ func (c *schedulerCache) GetSnapshot(ctx context.Context, bucket service.Schedul
 		if val == nil {
 			return nil, false, nil
 		}
-		account, err := decodeCachedAccount(val)
+		accountID, err := strconv.ParseInt(ids[i], 10, 64)
+		if err != nil {
+			return nil, false, fmt.Errorf("parse cached account id %q: %w", ids[i], err)
+		}
+		account, err := decodeCachedAccountWithKeyring(val, accountID, c.keyring)
 		if err != nil {
 			return nil, false, err
 		}
@@ -575,7 +585,7 @@ func (c *schedulerCache) GetAccount(ctx context.Context, accountID int64) (*serv
 	if len(values) != 2 || values[0] == nil {
 		return nil, nil
 	}
-	account, err := decodeCachedAccount(values[0])
+	account, err := decodeCachedAccountWithKeyring(values[0], accountID, c.keyring)
 	if err != nil {
 		return nil, err
 	}
@@ -759,7 +769,16 @@ func applySchedulerLastUsed(account *service.Account, value any) error {
 	return nil
 }
 
+type encryptedSchedulerAccount struct {
+	Version    int    `json:"version"`
+	Ciphertext string `json:"ciphertext"`
+}
+
 func decodeCachedAccount(val any) (*service.Account, error) {
+	return decodeCachedAccountWithKeyring(val, 0, nil)
+}
+
+func decodeCachedAccountWithKeyring(val any, accountID int64, keyring *accountcredential.Keyring) (*service.Account, error) {
 	var payload []byte
 	switch raw := val.(type) {
 	case string:
@@ -768,6 +787,20 @@ func decodeCachedAccount(val any) (*service.Account, error) {
 		payload = raw
 	default:
 		return nil, fmt.Errorf("unexpected account cache type: %T", val)
+	}
+	if keyring != nil {
+		var envelope encryptedSchedulerAccount
+		if err := json.Unmarshal(payload, &envelope); err != nil {
+			return nil, fmt.Errorf("decode encrypted scheduler account envelope: %w", err)
+		}
+		if envelope.Version <= 0 || envelope.Ciphertext == "" {
+			return nil, fmt.Errorf("encrypted scheduler account envelope is incomplete")
+		}
+		plaintext, err := keyring.OpenCache(envelope.Ciphertext, envelope.Version, strconv.FormatInt(accountID, 10), time.Now())
+		if err != nil {
+			return nil, err
+		}
+		payload = plaintext
 	}
 	var account service.Account
 	if err := json.Unmarshal(payload, &account); err != nil {
@@ -797,7 +830,7 @@ func (c *schedulerCache) writeAccountIDs(ctx context.Context, accounts []service
 	}
 
 	for _, account := range accounts {
-		fullPayload, metaPayload, err := marshalSchedulerCacheAccount(account)
+		fullPayload, metaPayload, err := marshalSchedulerCacheAccount(account, c.keyring)
 		if err != nil {
 			slog.Warn("scheduler cache skips account with unencodable payload",
 				"account_id", account.ID,
@@ -826,10 +859,20 @@ func (c *schedulerCache) writeAccountIDs(ctx context.Context, accounts []service
 	return accountIDs, nil
 }
 
-func marshalSchedulerCacheAccount(account service.Account) ([]byte, []byte, error) {
+func marshalSchedulerCacheAccount(account service.Account, keyrings ...*accountcredential.Keyring) ([]byte, []byte, error) {
 	fullPayload, err := json.Marshal(account)
 	if err != nil {
 		return nil, nil, fmt.Errorf("marshal account: %w", err)
+	}
+	if len(keyrings) > 0 && keyrings[0] != nil {
+		ciphertext, version, err := keyrings[0].SealCache(fullPayload, strconv.FormatInt(account.ID, 10))
+		if err != nil {
+			return nil, nil, fmt.Errorf("encrypt scheduler account: %w", err)
+		}
+		fullPayload, err = json.Marshal(encryptedSchedulerAccount{Version: version, Ciphertext: ciphertext})
+		if err != nil {
+			return nil, nil, fmt.Errorf("marshal encrypted scheduler account envelope: %w", err)
+		}
 	}
 	metaPayload, err := json.Marshal(buildSchedulerMetadataAccount(account))
 	if err != nil {
@@ -954,7 +997,7 @@ func filterSchedulerCredentials(credentials map[string]any) map[string]any {
 	if len(credentials) == 0 {
 		return nil
 	}
-	keys := []string{"model_mapping", "compact_model_mapping", "api_key", "project_id", "oauth_type", "plan_type"}
+	keys := []string{"model_mapping", "compact_model_mapping", "project_id", "oauth_type", "plan_type"}
 	filtered := make(map[string]any)
 	for _, key := range keys {
 		if value, ok := credentials[key]; ok && value != nil {

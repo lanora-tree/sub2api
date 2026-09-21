@@ -53,8 +53,8 @@ M6.1 最终验证结果：真实 PostgreSQL 18 上的 migration、opening、不�
 
 ## 需要修改
 
-1. API Key 从明文改为 HMAC 摘要，只在创建时展示一次。
-2. Account credentials 从 JSONB 明文改为独立密钥加密。
+1. API Key 从明文改为 HMAC 摘要，只在创建时展示一次（M6.4 已完成）。
+2. Account credentials 从 JSONB 明文改为独立密钥加密（M6.5 已完成）。
 3. 金额热路径从 float64 改为 Decimal，明确 CNY 语义。
 4. 把 usage log、余额和钱包流水纳入同一结算事务。
 5. 扩展 Composite Route，增加 `target_group_id` 和 only explicit 模式。
@@ -75,7 +75,7 @@ M6.1 最终验证结果：真实 PostgreSQL 18 上的 migration、opening、不�
 ## 最大的五个技术和项目风险
 
 1. Codex Subscription 账号池可能违反上游账号共享、转售或 Usage Limit 规则，可能导致账号封禁和项目无法按当前模式运行。
-2. 用户 API Key 与上游账号凭据当前可在数据库中以明文读取，数据库或备份泄漏会直接暴露可用 Secret。
+2. M6.4/M6.5 已清除当前数据库的 API Key 和上游凭据明文设计；历史备份仍可能含旧 Secret，生产前必须制定备份保留/销毁和外部密钥管理策略。
 3. float64、缺少完整钱包总账、价格版本和原子 usage log 会造成账单精度、追溯与对账风险。
 4. Codex Subscription 与 OpenAI Official API 同属 `openai` 平台，当前 Composite Route 不能锁定目标 Group，存在误选高成本账号池的风险。
 5. Codex、Cursor 和 DeepSeek 协议变化快。DeepSeek 已停用需求指定的两个旧模型名，客户端与模型兼容必须依赖真实版本测试。
@@ -304,7 +304,7 @@ README_CN 另有以下项目声明：服务条款风险、仅供技术学习研�
 ## 18. Technical Debt
 
 1. Ent float field 映射 NUMERIC，类型安全不足。
-2. Account credential 注释与实现不一致。
+2. Account credential 主密钥仍由环境/配置注入，生产 Secret Manager、备份密钥保管和轮换 runbook 尚待 M13 落地。
 3. Ent schema 和后期裸 SQL table 混合，迁移设计需要双重检查。
 4. Payment 和商业功能范围大，设置、route 与 UI 可能出现开关漂移。
 5. OpenAI Gateway 热点文件体积和职责较大，直接修改易与 upstream 冲突。
@@ -396,3 +396,28 @@ README_CN 另有以下项目声明：服务条款风险、仅供技术学习研�
 3. “共号”不表示共享本地账号、API Key 或上游 Secret。每个用户使用独立本地身份和 API Key，多个用户只是在路由层命中同一个 `target_group_id`，由该 Group 的上游账号池承载请求。
 4. Token、余额、usage、价格快照、账单与退款必须以认证用户和 API Key 独立归属。共享 Group 只影响上游调度，不能成为数据可见性或结算归属边界。
 5. M6.7 需要验证两个用户可同时命中同一 Group 且不能读取彼此数据；M7/M12 需要验证并发预留、实际 Token 结算、失败释放、退款和对账不串账。若共享的是个人订阅账号而非允许多租户使用的官方 API 账号，仍受 R1 合规门禁约束。
+
+## 27. M6.5 实施前复核
+
+1. 2026-09-20 复核 `upstream/main` 已前进到 `7c700729c23187d31ed320f6b19c790e2f194826`，固定审计基线落后 553 个提交；upstream migration 最大编号仍为 238，本分支下一 migration 使用 244，不同步未审计 upstream 代码。
+2. Account credential 加密不能只包住 Ent 的 `SetCredentials`：原生 SQL 仍使用 JSONB 进行 OAuth refresh 候选筛选、完整凭据 CAS、账号重复检查、Ollama Cloud API Key 查找/分组和批量 merge。每一条路径都必须改为安全 metadata、keyed fingerprint 或受控解密，否则会出现 Secret 回写明文或功能静默失效。
+3. 现有 OAuth/Grok CAS 用完整明文 JSON 防止旧 refresh 覆盖管理员刚完成的重授权。随机 Nonce 密文不能通过重新加密做相等比较，因此需要数据库保存不泄漏原文的 keyed fingerprint，并在轮换期同时接受 active/previous 候选；不能退化为只按 account ID 更新。
+4. `credentials_meta` 必须采用明确安全投影，不能简单复制原 JSON 再删除几个已知字段。未知 Provider 字段默认视为敏感，只允许业务查询确实需要的 allowlist 字段、布尔存在标记和 keyed lookup digest 进入 metadata。
+5. 共享上游账号池只复用目标 Group 的调度能力。Account 主密钥、密文、解密后 map、OAuth Token、Cookie 与 API Key 均不得进入用户 DTO、用户日志、账单、wallet 流水或跨用户缓存键。
+
+## 28. GPT Pro 实验性共享池决策
+
+1. 2026-09-21 产品负责人选择保留 GPT Pro/Codex Subscription 共享池的代码能力，但不得把个人订阅账号作为生产默认或 V1 上线依赖。
+2. 此类账号必须同时满足“实验类型、管理员显式启用、已记录授权确认”三个条件才可调度；缺少任一条件均 fail closed。普通 API/OAuth 上游不受该实验门禁误伤。
+3. 授权确认必须是可审计的管理员操作，自动化不得代签，也不得仅凭账号已有 OAuth Token 推断授权。关闭实验开关或撤销确认后，账号应立即退出候选池但保留可审计历史。
+4. 两个本地用户共享实验账号时，余额、usage、账单、退款、Sticky/previous-response 命名空间和可见性仍以本地用户/API Key 隔离；上游限额与故障则由共享账号共同承担。
+5. 正式生产默认使用明确允许服务端或多租户工作负载的 API/服务账户。M3 与 M14 的合规人工门禁继续保留。
+
+## 29. M6.5 验收与 Ponytail full 审计结论
+
+1. 上游凭据加密的必要复杂度来自现实路径：随机 Nonce 密文不能直接做 OAuth/Grok CAS，Ollama Cloud 需要按 API Key 查找，Scheduler 需要 Redis 快照，密钥轮换需要 active/previous 过渡。因此 AES-GCM、keyed fingerprint、lookup digest、缓存密文和有界轮换都保留。
+2. 审计确认了一处实际明文回写漏洞：原 BulkUpdate 会把凭据 patch 直接 merge 回 legacy JSONB。现改为单事务内按 ID 加锁、解密、merge 和重新加密，并有回归测试。
+3. 过度设计已删减：`credentials_meta` 不再维护未被查询的大型 allowlist，只保留严格匹配官方 Ollama Cloud 的 `base_url`；未知字段全部默认加密。同时删除未使用索引，合并重复加解密实现，不预先引入复杂批量 SQL。
+4. 真实 PostgreSQL 18 验证了 legacy API Key/OAuth/Cookie 账号的明文拦截、backfill、重启幂等、逐行解密、metadata/digest/刷新标记、active-to-previous 轮换和约束验证。全量 Backend 回归通过。
+5. 候选镜像在隔离新库上完成安装并返回健康；缺少 account credential active key 时在业务访问前以 exit code 1 失败关闭，迁移记录未变。稳定 M2 数据库未执行 migration 244。
+6. M6.6 应保持同样边界：只完成 usage 钱包原子结算与最小对账告警，不顺带引入价格平台、外部充值或通用事件总线。

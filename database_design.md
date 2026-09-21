@@ -262,13 +262,16 @@ Pepper 轮换采用 active 与 previous 两版本的有界双读。认证时分�
 credentials_encrypted TEXT
 credentials_key_version SMALLINT
 credentials_aad_id UUID NOT NULL
+credentials_fingerprint VARCHAR(64)
+credentials_api_key_digest VARCHAR(64)
+credentials_has_refresh_token BOOLEAN NOT NULL DEFAULT FALSE
 credentials_meta JSONB NOT NULL DEFAULT '{}'
-credentials JSONB NULL
+credentials JSONB NOT NULL DEFAULT '{}'
 ```
 
-使用独立 `ACCOUNT_CREDENTIALS_ENCRYPTION_KEY` 的 AES 256 GCM。每行随机 Nonce，密文绑定 `credentials_aad_id`、platform 与 key version 作为 AAD。独立 UUID 由应用在插入前生成，避免依赖数据库扩展，也避免新账号尚无数据库 ID 时出现先明文落库或二次写入窗口。`credentials_meta` 只放 base URL、模型能力等非 Secret。
+使用独立 `ACCOUNT_CREDENTIALS_ACTIVE_KEY` 的 AES-256-GCM。每行随机 Nonce，密文绑定 `credentials_aad_id`、platform 与 key version 作为 AAD。独立 UUID 由应用在插入前生成，避免依赖数据库扩展，也避免新账号尚无数据库 ID 时出现先明文落库或二次写入窗口。`credentials_meta` 只在严格匹配官方 Ollama Cloud 地址时保存字符串型 `base_url`；其他 URL 和未知字段默认留在密文内。keyed fingerprint 保持刷新 CAS，API Key keyed digest 支持跨账号分组查询，refresh-token 布尔位支持后台候选筛选。
 
-迁移先双读，后加密回填，验证解密成功，再清空旧 `credentials` 中的 Token、Key、Cookie 和密码。现有 `backend/internal/repository/aes_encryptor.go` 可参考算法，但不能复用 TOTP Encryption Key。
+迁移在事务和 advisory lock 内完成逐行加密、解密验证和旧 `credentials` 清空；任何一行失败即整体回滚。现有 `backend/internal/repository/aes_encryptor.go` 只作算法参考，不能复用 TOTP Encryption Key。
 
 ### 5.5 `usage_logs`
 

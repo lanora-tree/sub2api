@@ -8,6 +8,7 @@ import (
 	entsql "entgo.io/ent/dialect/sql"
 	"github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/accountcredential"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/google/wire"
 	"github.com/redis/go-redis/v9"
@@ -49,7 +50,14 @@ func ProvideSessionLimitCache(rdb *redis.Client, cfg *config.Config) service.Ses
 }
 
 // ProvideSchedulerCache 创建调度快照缓存，并注入快照分块参数。
-func ProvideSchedulerCache(rdb *redis.Client, cfg *config.Config) service.SchedulerCache {
+func ProvideAccountCredentialKeyring(cfg *config.Config) (*accountcredential.Keyring, error) {
+	if cfg == nil {
+		return nil, errors.New("account credential config is required")
+	}
+	return cfg.AccountCredentials.Keyring()
+}
+
+func ProvideSchedulerCache(rdb *redis.Client, cfg *config.Config, keyring *accountcredential.Keyring) service.SchedulerCache {
 	mgetChunkSize := defaultSchedulerSnapshotMGetChunkSize
 	writeChunkSize := defaultSchedulerSnapshotWriteChunkSize
 	if cfg != nil {
@@ -60,7 +68,7 @@ func ProvideSchedulerCache(rdb *redis.Client, cfg *config.Config) service.Schedu
 			writeChunkSize = cfg.Gateway.Scheduling.SnapshotWriteChunkSize
 		}
 	}
-	return newSchedulerCacheWithChunkSizes(rdb, mgetChunkSize, writeChunkSize)
+	return newSchedulerCacheWithChunkSizes(rdb, mgetChunkSize, writeChunkSize, keyring)
 }
 
 // ProviderSet is the Wire provider set for all repositories
@@ -132,6 +140,7 @@ var ProviderSet = wire.NewSet(
 	NewBatchImageDownloadLimiter,
 	NewLeaderLockCache,
 	ProvideSchedulerCache,
+	ProvideAccountCredentialKeyring,
 	NewSchedulerOutboxRepository,
 	NewAuthCacheInvalidationOutboxRepository,
 	NewProxyLatencyCache,

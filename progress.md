@@ -4,12 +4,12 @@
 
 * 项目代号：中转站
 * 上游项目：Sub2API
-* 记录日期：2026-09-20 UTC+8
+* 记录日期：2026-09-21 UTC+8
 * 当前阶段：M6 用户、密钥、路由与钱包基础
 * 阶段状态：`in_progress`
-* 当前任务：M6.4 API Key HMAC 摘要已完成；下一项 M6.5 上游账号凭据加密
+* 当前任务：M6.5 上游账号凭据加密已完成；下一项 M6.6 usage 钱包原子结算与对账告警
 
-M0、M1 与 M2 已完成。M6.1 至 M6.4 已依次完成 CNY 钱包基础、管理员钱包操作、Composite 用户模型权限和 API Key HMAC 摘要，并通过真实 PostgreSQL、完整前后端回归、候选镜像和隔离黑盒验收。M6 继续 `in_progress`，下一项为上游账号凭据加密。V1 已确定采用“用户独立余额、独立账单、共享上游 Group 账号池”，外部自动充值延期；未接入真实 Provider 凭据或真实收费数据。
+M0、M1 与 M2 已完成。M6.1 至 M6.5 已依次完成 CNY 钱包基础、管理员钱包操作、Composite 用户模型权限、API Key HMAC 摘要和上游账号凭据加密，并通过真实 PostgreSQL、完整后端回归、候选镜像和隔离黑盒验收。M6 继续 `in_progress`，下一项为 usage 钱包原子结算与对账告警。V1 已确定采用“用户独立余额、独立账单、共享上游 Group 账号池”，外部自动充值延期；未接入真实 Provider 凭据或真实收费数据。
 
 ## 2. 里程碑看板
 
@@ -21,7 +21,7 @@ M0、M1 与 M2 已完成。M6.1 至 M6.4 已依次完成 CNY 钱包基础、管�
 | M3 | Codex Subscription 验证 | `pending` | 等待 M2、M6、M7、合规确认和合法测试账号 |
 | M4 | OpenAI Official API | `pending` | 等待 M2、M6、M7 的基础能力 |
 | M5 | DeepSeek Official API | `pending` | 等待 M2、M6、M7、模型名和价格人工确认 |
-| M6 | 用户、密钥、路由与钱包基础 | `in_progress` | M6.1-M6.4 已验收；下一项 M6.5 上游账号凭据加密 |
+| M6 | 用户、密钥、路由与钱包基础 | `in_progress` | M6.1-M6.5 已验收；下一项 M6.6 usage 钱包原子结算与对账告警 |
 | M7 | 动态价格与历史快照 | `pending` | 等待 M6 |
 | M8 | Internal Recharge API | `deferred` | V1 仅保留管理员人工调账；上线后再评估 |
 | M9 | 管理后台精简 | `pending` | 等待核心后端功能稳定 |
@@ -725,9 +725,59 @@ M6.1 完成并可形成独立提交。Migration 已在本地测试库执行，�
 
 * V1 不做用户自助充值或外部自动充值，M8 改为 `deferred`。余额只能通过 M6.2 已有的管理员充值、正负调账和退款事务修改，禁止直接编辑 `users.balance`。
 * 共享账号池采用“本地用户/API Key 独立、余额与账单独立、多个用户共享同一个目标 Group 上游账号池”。Token、usage、账单和退款始终归属认证用户与 API Key；用户之间不可见。
+* 2026-09-21 产品负责人确认：GPT Pro/Codex Subscription 方案仅保留代码层支持，默认标记为“实验/合规待确认”并禁用，不纳入正式上线依赖；只有管理员在系统中记录明确授权并显式打开实验开关后，账号才允许进入共享调度池。正式生产默认采用明确允许服务端/多租户使用的 API 或服务账户。
 * M6 下一顺序项为 M6.5 上游账号凭据加密；之后完成对账告警与 M6.7 精确目标 Group 路由，并在 M6.7/M7 动态价格中加入两用户共享同一 Group、独立结算且并发不串账的验收用例。
 
-## 23. 后续记录模板
+## 24. 2026-09-21 / M6.5 完成：上游账号凭据独立加密
+
+### 目标与边界
+
+本子任务只迁移 `accounts.credentials` 的持久化、读取、并发比较、刷新写回、调度快照和 Admin 脱敏边界。所有 Provider 的 API Key、OAuth Token、Cookie、密码和客户端 Secret 使用独立密钥域的 AES-256-GCM 加密；共享上游 Group 只允许服务端在调度/刷新最小范围解密，用户侧永远不能取得上游凭据。钱包 usage 结算、对账任务、M6.7 精确 Group 路由和 M7 价格仍按后续子任务实施。
+
+### Schema 与凭据结构敏感改动说明
+
+* 原因：`accounts.credentials` 当前是可直接读取的 JSONB，Repository 创建、更新、OAuth 刷新、Grok CAS 与 Ollama Cloud 查询都依赖明文 JSON；数据库或备份泄漏会直接暴露可用上游 Secret。
+* 影响：已新增 forward-only migration `244_account_credentials_encryption.sql`、独立 Account credential keyring/config、AES-256-GCM codec、启动 backfill、Account Ent 安全字段、Repository 读写和原生 SQL 路径、Scheduler/Redis 快照与部署配置。现有 TOTP `AESEncryptor` 只作算法参考，没有复用其密钥。
+* AAD：应用在首次持久化前生成独立 `credentials_aad_id`，密文绑定该 UUID、platform 与 key version；每次加密使用随机 Nonce。数据库保存密文、密钥版本、安全元数据和 keyed fingerprint，主密钥只由运行时 Secret 注入。
+* 并发：当前用明文 JSON 比较的 OAuth 刷新/重授权 CAS 改为 keyed fingerprint 的 active/previous 候选比较，保持“并发重授权不能被旧刷新覆盖”的语义；任何解密、版本或完整性错误均 fail closed，不把空凭据送入 Provider。
+* 回滚：backfill 验证所有行可解密后才清空 legacy `credentials`。一旦清空，旧应用不能读取账号 Secret；生产回滚必须恢复升级前数据库备份、旧镜像和对应旧 Secret，或使用后续 forward fix，不能只回退应用。
+
+### 上游与迁移号复核
+
+* 2026-09-20 已重新 `git fetch upstream main`；`upstream/main` 为 `7c700729c23187d31ed320f6b19c790e2f194826`，固定审计基线落后 553 个提交。继续在已验收固定基线上开发，不静默合并 upstream。
+* `upstream/main` migration 最大编号仍为 238，本分支已发布至 243，因此本子任务使用 244；239 至 243 不修改、重命名或删除。
+
+### 完成实现
+
+* `accountcredential` 提供域分离 AES-256-GCM、随机 Nonce、AAD、keyed fingerprint/API-key lookup digest，以及只保留 active 和一个 previous 的有界轮换。错误密钥、版本、AAD 或密文均 fail closed。
+* Migration 244 先以 `NOT VALID` 阻止新明文写入，再在启动事务中逐行加锁、解密/加密验证、清空 legacy JSON 并验证约束；重复启动幂等。
+* Repository 的 Create、Update、OAuth/Grok CAS、Duplicate、BulkUpdate 和 Ollama Cloud 原生 SQL 路径已全部改为密文、keyed fingerprint、存在标记或受控解密。Scheduler Redis 快照使用独立缓存 AAD 加密，不再保存上游 Secret 明文。
+* 部署示例、四个 Compose 和两个部署脚本都要求独立 `ACCOUNT_CREDENTIALS_*` 密钥。稳定 M2 数据库和容器未执行 migration 244。
+
+### Ponytail full 过度设计审计
+
+* 保留 AES-GCM、AAD、有界密钥轮换、CAS fingerprint、API-key lookup digest 和 Redis 快照保护：它们分别对应真实存储、并发和调度路径，不是抽象预支。
+* 删除了未被业务查询的大型 `credentials_meta` allowlist；现在只投影严格匹配官方 Ollama Cloud 的 `base_url`，其他字段默认加密。
+* 删除了未使用的 key-version 索引，合并重复的 AES-GCM seal/open 实现。BulkUpdate 保留简单的逐账号事务更新，只在大账号池真实测出性能瓶颈后才值得引入复杂批量 SQL。
+
+### 验收结果
+
+| 验证 | 结果 |
+| --- | --- |
+| Backend 全套 | `go test ./... -count=1` 全部通过 |
+| 真实 PostgreSQL 18 | `TestAccountCredentialMigrationOnPostgreSQL` 通过；覆盖明文拦截、backfill、幂等、解密、metadata、digest、refresh 标记和 active/previous 轮换 |
+| 生成器 | `go generate ./ent` 与 `go generate ./cmd/server` 通过 |
+| Deploy | Compose Gateway 环境检查、Compose 安全检查和两个部署脚本语法检查通过；Apple lifecycle 因 Windows 不提供 BSD `stat -f` 未在本机重跑 |
+| 候选镜像 | `sub2api:m6.5-account-credentials`，digest `sha256:43246ee3603928642d6f44006037c81d783891b457f770386300a55671f910b8` |
+| 隔离黑盒 | 全新库安装后 `/health` 为 200，migration 244 与全部凭据约束已验证；缺少 active key 时 exit code 1，schema migration 计数不变 |
+
+根 Docker 构建两次因当前 `registry.dockermirror.com` 返回 HTTP 525，未进入代码编译。候选镜像因此复用已验收 M6.4 运行层与未改动的前端资源，仅替换由当前源码生成的 Linux 后端二进制。隔离容器、PostgreSQL、Redis、network 和临时验收镜像已移除；稳定 `sub2api:m2-scope-closure` 仍为 healthy。
+
+### 下一步
+
+M6 继续 `in_progress`。下一顺序项只做 M6.6：将 Gateway usage、`users.balance`、`wallet_transactions` 与幂等记录纳入原子结算，再加最小可运营对账告警。M6.7 精确目标 Group 路由和 M7 价格不在同一改动中顺带实现。
+
+## 附录：后续记录模板
 
 每次工作结束追加一节，不覆盖历史记录。
 

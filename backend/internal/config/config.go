@@ -90,6 +90,7 @@ type Config struct {
 	Gateway                 GatewayConfig                 `mapstructure:"gateway"`
 	APIKeyAuth              APIKeyAuthCacheConfig         `mapstructure:"api_key_auth_cache"`
 	APIKeyHMAC              APIKeyHMACConfig              `mapstructure:"api_key_hmac"`
+	AccountCredentials      AccountCredentialsConfig      `mapstructure:"account_credentials"`
 	SubscriptionCache       SubscriptionCacheConfig       `mapstructure:"subscription_cache"`
 	SubscriptionMaintenance SubscriptionMaintenanceConfig `mapstructure:"subscription_maintenance"`
 	Dashboard               DashboardCacheConfig          `mapstructure:"dashboard_cache"`
@@ -2187,6 +2188,14 @@ func setDefaults() {
 	viper.SetDefault("api_key_hmac.previous_version", 0)
 	viper.SetDefault("api_key_hmac.previous_pepper", "")
 	viper.SetDefault("api_key_hmac.previous_accept_until", "")
+
+	// Upstream account credential encryption. Keys are intentionally empty so
+	// AutomaticEnv can discover ACCOUNT_CREDENTIALS_* without embedding a key.
+	viper.SetDefault("account_credentials.active_version", 1)
+	viper.SetDefault("account_credentials.active_key", "")
+	viper.SetDefault("account_credentials.previous_version", 0)
+	viper.SetDefault("account_credentials.previous_key", "")
+	viper.SetDefault("account_credentials.previous_accept_until", "")
 
 	// Batch Image queue
 	viper.SetDefault("batch_image.enabled", false)

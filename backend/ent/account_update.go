@@ -16,6 +16,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/proxy"
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
+	"github.com/google/uuid"
 )
 
 // AccountUpdate is the builder for updating Account entities.
@@ -122,6 +123,103 @@ func (_u *AccountUpdate) SetNillableType(v *string) *AccountUpdate {
 // SetCredentials sets the "credentials" field.
 func (_u *AccountUpdate) SetCredentials(v map[string]interface{}) *AccountUpdate {
 	_u.mutation.SetCredentials(v)
+	return _u
+}
+
+// SetCredentialsEncrypted sets the "credentials_encrypted" field.
+func (_u *AccountUpdate) SetCredentialsEncrypted(v string) *AccountUpdate {
+	_u.mutation.SetCredentialsEncrypted(v)
+	return _u
+}
+
+// SetNillableCredentialsEncrypted sets the "credentials_encrypted" field if the given value is not nil.
+func (_u *AccountUpdate) SetNillableCredentialsEncrypted(v *string) *AccountUpdate {
+	if v != nil {
+		_u.SetCredentialsEncrypted(*v)
+	}
+	return _u
+}
+
+// SetCredentialsKeyVersion sets the "credentials_key_version" field.
+func (_u *AccountUpdate) SetCredentialsKeyVersion(v int) *AccountUpdate {
+	_u.mutation.ResetCredentialsKeyVersion()
+	_u.mutation.SetCredentialsKeyVersion(v)
+	return _u
+}
+
+// SetNillableCredentialsKeyVersion sets the "credentials_key_version" field if the given value is not nil.
+func (_u *AccountUpdate) SetNillableCredentialsKeyVersion(v *int) *AccountUpdate {
+	if v != nil {
+		_u.SetCredentialsKeyVersion(*v)
+	}
+	return _u
+}
+
+// AddCredentialsKeyVersion adds value to the "credentials_key_version" field.
+func (_u *AccountUpdate) AddCredentialsKeyVersion(v int) *AccountUpdate {
+	_u.mutation.AddCredentialsKeyVersion(v)
+	return _u
+}
+
+// SetCredentialsAadID sets the "credentials_aad_id" field.
+func (_u *AccountUpdate) SetCredentialsAadID(v uuid.UUID) *AccountUpdate {
+	_u.mutation.SetCredentialsAadID(v)
+	return _u
+}
+
+// SetNillableCredentialsAadID sets the "credentials_aad_id" field if the given value is not nil.
+func (_u *AccountUpdate) SetNillableCredentialsAadID(v *uuid.UUID) *AccountUpdate {
+	if v != nil {
+		_u.SetCredentialsAadID(*v)
+	}
+	return _u
+}
+
+// SetCredentialsFingerprint sets the "credentials_fingerprint" field.
+func (_u *AccountUpdate) SetCredentialsFingerprint(v string) *AccountUpdate {
+	_u.mutation.SetCredentialsFingerprint(v)
+	return _u
+}
+
+// SetNillableCredentialsFingerprint sets the "credentials_fingerprint" field if the given value is not nil.
+func (_u *AccountUpdate) SetNillableCredentialsFingerprint(v *string) *AccountUpdate {
+	if v != nil {
+		_u.SetCredentialsFingerprint(*v)
+	}
+	return _u
+}
+
+// SetCredentialsAPIKeyDigest sets the "credentials_api_key_digest" field.
+func (_u *AccountUpdate) SetCredentialsAPIKeyDigest(v string) *AccountUpdate {
+	_u.mutation.SetCredentialsAPIKeyDigest(v)
+	return _u
+}
+
+// SetNillableCredentialsAPIKeyDigest sets the "credentials_api_key_digest" field if the given value is not nil.
+func (_u *AccountUpdate) SetNillableCredentialsAPIKeyDigest(v *string) *AccountUpdate {
+	if v != nil {
+		_u.SetCredentialsAPIKeyDigest(*v)
+	}
+	return _u
+}
+
+// SetCredentialsHasRefreshToken sets the "credentials_has_refresh_token" field.
+func (_u *AccountUpdate) SetCredentialsHasRefreshToken(v bool) *AccountUpdate {
+	_u.mutation.SetCredentialsHasRefreshToken(v)
+	return _u
+}
+
+// SetNillableCredentialsHasRefreshToken sets the "credentials_has_refresh_token" field if the given value is not nil.
+func (_u *AccountUpdate) SetNillableCredentialsHasRefreshToken(v *bool) *AccountUpdate {
+	if v != nil {
+		_u.SetCredentialsHasRefreshToken(*v)
+	}
+	return _u
+}
+
+// SetCredentialsMeta sets the "credentials_meta" field.
+func (_u *AccountUpdate) SetCredentialsMeta(v map[string]interface{}) *AccountUpdate {
+	_u.mutation.SetCredentialsMeta(v)
 	return _u
 }
 
@@ -772,6 +870,21 @@ func (_u *AccountUpdate) check() error {
 			return &ValidationError{Name: "type", err: fmt.Errorf(`ent: validator failed for field "Account.type": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.CredentialsKeyVersion(); ok {
+		if err := account.CredentialsKeyVersionValidator(v); err != nil {
+			return &ValidationError{Name: "credentials_key_version", err: fmt.Errorf(`ent: validator failed for field "Account.credentials_key_version": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CredentialsFingerprint(); ok {
+		if err := account.CredentialsFingerprintValidator(v); err != nil {
+			return &ValidationError{Name: "credentials_fingerprint", err: fmt.Errorf(`ent: validator failed for field "Account.credentials_fingerprint": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CredentialsAPIKeyDigest(); ok {
+		if err := account.CredentialsAPIKeyDigestValidator(v); err != nil {
+			return &ValidationError{Name: "credentials_api_key_digest", err: fmt.Errorf(`ent: validator failed for field "Account.credentials_api_key_digest": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Status(); ok {
 		if err := account.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Account.status": %w`, err)}
@@ -828,6 +941,30 @@ func (_u *AccountUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.Credentials(); ok {
 		_spec.SetField(account.FieldCredentials, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.CredentialsEncrypted(); ok {
+		_spec.SetField(account.FieldCredentialsEncrypted, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.CredentialsKeyVersion(); ok {
+		_spec.SetField(account.FieldCredentialsKeyVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedCredentialsKeyVersion(); ok {
+		_spec.AddField(account.FieldCredentialsKeyVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.CredentialsAadID(); ok {
+		_spec.SetField(account.FieldCredentialsAadID, field.TypeUUID, value)
+	}
+	if value, ok := _u.mutation.CredentialsFingerprint(); ok {
+		_spec.SetField(account.FieldCredentialsFingerprint, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.CredentialsAPIKeyDigest(); ok {
+		_spec.SetField(account.FieldCredentialsAPIKeyDigest, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.CredentialsHasRefreshToken(); ok {
+		_spec.SetField(account.FieldCredentialsHasRefreshToken, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.CredentialsMeta(); ok {
+		_spec.SetField(account.FieldCredentialsMeta, field.TypeJSON, value)
 	}
 	if value, ok := _u.mutation.Extra(); ok {
 		_spec.SetField(account.FieldExtra, field.TypeJSON, value)
@@ -1262,6 +1399,103 @@ func (_u *AccountUpdateOne) SetNillableType(v *string) *AccountUpdateOne {
 // SetCredentials sets the "credentials" field.
 func (_u *AccountUpdateOne) SetCredentials(v map[string]interface{}) *AccountUpdateOne {
 	_u.mutation.SetCredentials(v)
+	return _u
+}
+
+// SetCredentialsEncrypted sets the "credentials_encrypted" field.
+func (_u *AccountUpdateOne) SetCredentialsEncrypted(v string) *AccountUpdateOne {
+	_u.mutation.SetCredentialsEncrypted(v)
+	return _u
+}
+
+// SetNillableCredentialsEncrypted sets the "credentials_encrypted" field if the given value is not nil.
+func (_u *AccountUpdateOne) SetNillableCredentialsEncrypted(v *string) *AccountUpdateOne {
+	if v != nil {
+		_u.SetCredentialsEncrypted(*v)
+	}
+	return _u
+}
+
+// SetCredentialsKeyVersion sets the "credentials_key_version" field.
+func (_u *AccountUpdateOne) SetCredentialsKeyVersion(v int) *AccountUpdateOne {
+	_u.mutation.ResetCredentialsKeyVersion()
+	_u.mutation.SetCredentialsKeyVersion(v)
+	return _u
+}
+
+// SetNillableCredentialsKeyVersion sets the "credentials_key_version" field if the given value is not nil.
+func (_u *AccountUpdateOne) SetNillableCredentialsKeyVersion(v *int) *AccountUpdateOne {
+	if v != nil {
+		_u.SetCredentialsKeyVersion(*v)
+	}
+	return _u
+}
+
+// AddCredentialsKeyVersion adds value to the "credentials_key_version" field.
+func (_u *AccountUpdateOne) AddCredentialsKeyVersion(v int) *AccountUpdateOne {
+	_u.mutation.AddCredentialsKeyVersion(v)
+	return _u
+}
+
+// SetCredentialsAadID sets the "credentials_aad_id" field.
+func (_u *AccountUpdateOne) SetCredentialsAadID(v uuid.UUID) *AccountUpdateOne {
+	_u.mutation.SetCredentialsAadID(v)
+	return _u
+}
+
+// SetNillableCredentialsAadID sets the "credentials_aad_id" field if the given value is not nil.
+func (_u *AccountUpdateOne) SetNillableCredentialsAadID(v *uuid.UUID) *AccountUpdateOne {
+	if v != nil {
+		_u.SetCredentialsAadID(*v)
+	}
+	return _u
+}
+
+// SetCredentialsFingerprint sets the "credentials_fingerprint" field.
+func (_u *AccountUpdateOne) SetCredentialsFingerprint(v string) *AccountUpdateOne {
+	_u.mutation.SetCredentialsFingerprint(v)
+	return _u
+}
+
+// SetNillableCredentialsFingerprint sets the "credentials_fingerprint" field if the given value is not nil.
+func (_u *AccountUpdateOne) SetNillableCredentialsFingerprint(v *string) *AccountUpdateOne {
+	if v != nil {
+		_u.SetCredentialsFingerprint(*v)
+	}
+	return _u
+}
+
+// SetCredentialsAPIKeyDigest sets the "credentials_api_key_digest" field.
+func (_u *AccountUpdateOne) SetCredentialsAPIKeyDigest(v string) *AccountUpdateOne {
+	_u.mutation.SetCredentialsAPIKeyDigest(v)
+	return _u
+}
+
+// SetNillableCredentialsAPIKeyDigest sets the "credentials_api_key_digest" field if the given value is not nil.
+func (_u *AccountUpdateOne) SetNillableCredentialsAPIKeyDigest(v *string) *AccountUpdateOne {
+	if v != nil {
+		_u.SetCredentialsAPIKeyDigest(*v)
+	}
+	return _u
+}
+
+// SetCredentialsHasRefreshToken sets the "credentials_has_refresh_token" field.
+func (_u *AccountUpdateOne) SetCredentialsHasRefreshToken(v bool) *AccountUpdateOne {
+	_u.mutation.SetCredentialsHasRefreshToken(v)
+	return _u
+}
+
+// SetNillableCredentialsHasRefreshToken sets the "credentials_has_refresh_token" field if the given value is not nil.
+func (_u *AccountUpdateOne) SetNillableCredentialsHasRefreshToken(v *bool) *AccountUpdateOne {
+	if v != nil {
+		_u.SetCredentialsHasRefreshToken(*v)
+	}
+	return _u
+}
+
+// SetCredentialsMeta sets the "credentials_meta" field.
+func (_u *AccountUpdateOne) SetCredentialsMeta(v map[string]interface{}) *AccountUpdateOne {
+	_u.mutation.SetCredentialsMeta(v)
 	return _u
 }
 
@@ -1925,6 +2159,21 @@ func (_u *AccountUpdateOne) check() error {
 			return &ValidationError{Name: "type", err: fmt.Errorf(`ent: validator failed for field "Account.type": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.CredentialsKeyVersion(); ok {
+		if err := account.CredentialsKeyVersionValidator(v); err != nil {
+			return &ValidationError{Name: "credentials_key_version", err: fmt.Errorf(`ent: validator failed for field "Account.credentials_key_version": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CredentialsFingerprint(); ok {
+		if err := account.CredentialsFingerprintValidator(v); err != nil {
+			return &ValidationError{Name: "credentials_fingerprint", err: fmt.Errorf(`ent: validator failed for field "Account.credentials_fingerprint": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CredentialsAPIKeyDigest(); ok {
+		if err := account.CredentialsAPIKeyDigestValidator(v); err != nil {
+			return &ValidationError{Name: "credentials_api_key_digest", err: fmt.Errorf(`ent: validator failed for field "Account.credentials_api_key_digest": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Status(); ok {
 		if err := account.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Account.status": %w`, err)}
@@ -1998,6 +2247,30 @@ func (_u *AccountUpdateOne) sqlSave(ctx context.Context) (_node *Account, err er
 	}
 	if value, ok := _u.mutation.Credentials(); ok {
 		_spec.SetField(account.FieldCredentials, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.CredentialsEncrypted(); ok {
+		_spec.SetField(account.FieldCredentialsEncrypted, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.CredentialsKeyVersion(); ok {
+		_spec.SetField(account.FieldCredentialsKeyVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedCredentialsKeyVersion(); ok {
+		_spec.AddField(account.FieldCredentialsKeyVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.CredentialsAadID(); ok {
+		_spec.SetField(account.FieldCredentialsAadID, field.TypeUUID, value)
+	}
+	if value, ok := _u.mutation.CredentialsFingerprint(); ok {
+		_spec.SetField(account.FieldCredentialsFingerprint, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.CredentialsAPIKeyDigest(); ok {
+		_spec.SetField(account.FieldCredentialsAPIKeyDigest, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.CredentialsHasRefreshToken(); ok {
+		_spec.SetField(account.FieldCredentialsHasRefreshToken, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.CredentialsMeta(); ok {
+		_spec.SetField(account.FieldCredentialsMeta, field.TypeJSON, value)
 	}
 	if value, ok := _u.mutation.Extra(); ok {
 		_spec.SetField(account.FieldExtra, field.TypeJSON, value)

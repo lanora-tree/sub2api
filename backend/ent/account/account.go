@@ -9,6 +9,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"github.com/google/uuid"
 )
 
 const (
@@ -32,6 +33,20 @@ const (
 	FieldType = "type"
 	// FieldCredentials holds the string denoting the credentials field in the database.
 	FieldCredentials = "credentials"
+	// FieldCredentialsEncrypted holds the string denoting the credentials_encrypted field in the database.
+	FieldCredentialsEncrypted = "credentials_encrypted"
+	// FieldCredentialsKeyVersion holds the string denoting the credentials_key_version field in the database.
+	FieldCredentialsKeyVersion = "credentials_key_version"
+	// FieldCredentialsAadID holds the string denoting the credentials_aad_id field in the database.
+	FieldCredentialsAadID = "credentials_aad_id"
+	// FieldCredentialsFingerprint holds the string denoting the credentials_fingerprint field in the database.
+	FieldCredentialsFingerprint = "credentials_fingerprint"
+	// FieldCredentialsAPIKeyDigest holds the string denoting the credentials_api_key_digest field in the database.
+	FieldCredentialsAPIKeyDigest = "credentials_api_key_digest"
+	// FieldCredentialsHasRefreshToken holds the string denoting the credentials_has_refresh_token field in the database.
+	FieldCredentialsHasRefreshToken = "credentials_has_refresh_token"
+	// FieldCredentialsMeta holds the string denoting the credentials_meta field in the database.
+	FieldCredentialsMeta = "credentials_meta"
 	// FieldExtra holds the string denoting the extra field in the database.
 	FieldExtra = "extra"
 	// FieldProxyID holds the string denoting the proxy_id field in the database.
@@ -139,6 +154,13 @@ var Columns = []string{
 	FieldPlatform,
 	FieldType,
 	FieldCredentials,
+	FieldCredentialsEncrypted,
+	FieldCredentialsKeyVersion,
+	FieldCredentialsAadID,
+	FieldCredentialsFingerprint,
+	FieldCredentialsAPIKeyDigest,
+	FieldCredentialsHasRefreshToken,
+	FieldCredentialsMeta,
 	FieldExtra,
 	FieldProxyID,
 	FieldProxyFallbackOriginID,
@@ -202,6 +224,26 @@ var (
 	TypeValidator func(string) error
 	// DefaultCredentials holds the default value on creation for the "credentials" field.
 	DefaultCredentials func() map[string]interface{}
+	// DefaultCredentialsEncrypted holds the default value on creation for the "credentials_encrypted" field.
+	DefaultCredentialsEncrypted string
+	// DefaultCredentialsKeyVersion holds the default value on creation for the "credentials_key_version" field.
+	DefaultCredentialsKeyVersion int
+	// CredentialsKeyVersionValidator is a validator for the "credentials_key_version" field. It is called by the builders before save.
+	CredentialsKeyVersionValidator func(int) error
+	// DefaultCredentialsAadID holds the default value on creation for the "credentials_aad_id" field.
+	DefaultCredentialsAadID func() uuid.UUID
+	// DefaultCredentialsFingerprint holds the default value on creation for the "credentials_fingerprint" field.
+	DefaultCredentialsFingerprint string
+	// CredentialsFingerprintValidator is a validator for the "credentials_fingerprint" field. It is called by the builders before save.
+	CredentialsFingerprintValidator func(string) error
+	// DefaultCredentialsAPIKeyDigest holds the default value on creation for the "credentials_api_key_digest" field.
+	DefaultCredentialsAPIKeyDigest string
+	// CredentialsAPIKeyDigestValidator is a validator for the "credentials_api_key_digest" field. It is called by the builders before save.
+	CredentialsAPIKeyDigestValidator func(string) error
+	// DefaultCredentialsHasRefreshToken holds the default value on creation for the "credentials_has_refresh_token" field.
+	DefaultCredentialsHasRefreshToken bool
+	// DefaultCredentialsMeta holds the default value on creation for the "credentials_meta" field.
+	DefaultCredentialsMeta func() map[string]interface{}
 	// DefaultExtra holds the default value on creation for the "extra" field.
 	DefaultExtra func() map[string]interface{}
 	// DefaultConcurrency holds the default value on creation for the "concurrency" field.
@@ -289,6 +331,36 @@ func ByPlatform(opts ...sql.OrderTermOption) OrderOption {
 // ByType orders the results by the type field.
 func ByType(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldType, opts...).ToFunc()
+}
+
+// ByCredentialsEncrypted orders the results by the credentials_encrypted field.
+func ByCredentialsEncrypted(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCredentialsEncrypted, opts...).ToFunc()
+}
+
+// ByCredentialsKeyVersion orders the results by the credentials_key_version field.
+func ByCredentialsKeyVersion(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCredentialsKeyVersion, opts...).ToFunc()
+}
+
+// ByCredentialsAadID orders the results by the credentials_aad_id field.
+func ByCredentialsAadID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCredentialsAadID, opts...).ToFunc()
+}
+
+// ByCredentialsFingerprint orders the results by the credentials_fingerprint field.
+func ByCredentialsFingerprint(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCredentialsFingerprint, opts...).ToFunc()
+}
+
+// ByCredentialsAPIKeyDigest orders the results by the credentials_api_key_digest field.
+func ByCredentialsAPIKeyDigest(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCredentialsAPIKeyDigest, opts...).ToFunc()
+}
+
+// ByCredentialsHasRefreshToken orders the results by the credentials_has_refresh_token field.
+func ByCredentialsHasRefreshToken(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCredentialsHasRefreshToken, opts...).ToFunc()
 }
 
 // ByProxyID orders the results by the proxy_id field.

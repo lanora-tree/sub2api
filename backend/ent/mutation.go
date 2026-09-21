@@ -55,6 +55,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
 	"github.com/Wei-Shaw/sub2api/ent/wallettransaction"
 	"github.com/Wei-Shaw/sub2api/internal/domain"
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 )
 
@@ -2536,60 +2537,68 @@ func (m *APIKeyMutation) ResetEdge(name string) error {
 // AccountMutation represents an operation that mutates the Account nodes in the graph.
 type AccountMutation struct {
 	config
-	op                          Op
-	typ                         string
-	id                          *int64
-	created_at                  *time.Time
-	updated_at                  *time.Time
-	deleted_at                  *time.Time
-	name                        *string
-	notes                       *string
-	platform                    *string
-	_type                       *string
-	credentials                 *map[string]interface{}
-	extra                       *map[string]interface{}
-	proxy_fallback_origin_id    *int64
-	addproxy_fallback_origin_id *int64
-	concurrency                 *int
-	addconcurrency              *int
-	load_factor                 *int
-	addload_factor              *int
-	priority                    *int
-	addpriority                 *int
-	rate_multiplier             *float64
-	addrate_multiplier          *float64
-	status                      *string
-	error_message               *string
-	last_used_at                *time.Time
-	expires_at                  *time.Time
-	auto_pause_on_expired       *bool
-	schedulable                 *bool
-	rate_limited_at             *time.Time
-	rate_limit_reset_at         *time.Time
-	overload_until              *time.Time
-	temp_unschedulable_until    *time.Time
-	temp_unschedulable_reason   *string
-	session_window_start        *time.Time
-	session_window_end          *time.Time
-	session_window_status       *string
-	quota_dimension             *account.QuotaDimension
-	clearedFields               map[string]struct{}
-	groups                      map[int64]struct{}
-	removedgroups               map[int64]struct{}
-	clearedgroups               bool
-	proxy                       *int64
-	clearedproxy                bool
-	parent                      *int64
-	clearedparent               bool
-	children                    map[int64]struct{}
-	removedchildren             map[int64]struct{}
-	clearedchildren             bool
-	usage_logs                  map[int64]struct{}
-	removedusage_logs           map[int64]struct{}
-	clearedusage_logs           bool
-	done                        bool
-	oldValue                    func(context.Context) (*Account, error)
-	predicates                  []predicate.Account
+	op                            Op
+	typ                           string
+	id                            *int64
+	created_at                    *time.Time
+	updated_at                    *time.Time
+	deleted_at                    *time.Time
+	name                          *string
+	notes                         *string
+	platform                      *string
+	_type                         *string
+	credentials                   *map[string]interface{}
+	credentials_encrypted         *string
+	credentials_key_version       *int
+	addcredentials_key_version    *int
+	credentials_aad_id            *uuid.UUID
+	credentials_fingerprint       *string
+	credentials_api_key_digest    *string
+	credentials_has_refresh_token *bool
+	credentials_meta              *map[string]interface{}
+	extra                         *map[string]interface{}
+	proxy_fallback_origin_id      *int64
+	addproxy_fallback_origin_id   *int64
+	concurrency                   *int
+	addconcurrency                *int
+	load_factor                   *int
+	addload_factor                *int
+	priority                      *int
+	addpriority                   *int
+	rate_multiplier               *float64
+	addrate_multiplier            *float64
+	status                        *string
+	error_message                 *string
+	last_used_at                  *time.Time
+	expires_at                    *time.Time
+	auto_pause_on_expired         *bool
+	schedulable                   *bool
+	rate_limited_at               *time.Time
+	rate_limit_reset_at           *time.Time
+	overload_until                *time.Time
+	temp_unschedulable_until      *time.Time
+	temp_unschedulable_reason     *string
+	session_window_start          *time.Time
+	session_window_end            *time.Time
+	session_window_status         *string
+	quota_dimension               *account.QuotaDimension
+	clearedFields                 map[string]struct{}
+	groups                        map[int64]struct{}
+	removedgroups                 map[int64]struct{}
+	clearedgroups                 bool
+	proxy                         *int64
+	clearedproxy                  bool
+	parent                        *int64
+	clearedparent                 bool
+	children                      map[int64]struct{}
+	removedchildren               map[int64]struct{}
+	clearedchildren               bool
+	usage_logs                    map[int64]struct{}
+	removedusage_logs             map[int64]struct{}
+	clearedusage_logs             bool
+	done                          bool
+	oldValue                      func(context.Context) (*Account, error)
+	predicates                    []predicate.Account
 }
 
 var _ ent.Mutation = (*AccountMutation)(nil)
@@ -3002,6 +3011,278 @@ func (m *AccountMutation) OldCredentials(ctx context.Context) (v map[string]inte
 // ResetCredentials resets all changes to the "credentials" field.
 func (m *AccountMutation) ResetCredentials() {
 	m.credentials = nil
+}
+
+// SetCredentialsEncrypted sets the "credentials_encrypted" field.
+func (m *AccountMutation) SetCredentialsEncrypted(s string) {
+	m.credentials_encrypted = &s
+}
+
+// CredentialsEncrypted returns the value of the "credentials_encrypted" field in the mutation.
+func (m *AccountMutation) CredentialsEncrypted() (r string, exists bool) {
+	v := m.credentials_encrypted
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCredentialsEncrypted returns the old "credentials_encrypted" field's value of the Account entity.
+// If the Account object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountMutation) OldCredentialsEncrypted(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCredentialsEncrypted is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCredentialsEncrypted requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCredentialsEncrypted: %w", err)
+	}
+	return oldValue.CredentialsEncrypted, nil
+}
+
+// ResetCredentialsEncrypted resets all changes to the "credentials_encrypted" field.
+func (m *AccountMutation) ResetCredentialsEncrypted() {
+	m.credentials_encrypted = nil
+}
+
+// SetCredentialsKeyVersion sets the "credentials_key_version" field.
+func (m *AccountMutation) SetCredentialsKeyVersion(i int) {
+	m.credentials_key_version = &i
+	m.addcredentials_key_version = nil
+}
+
+// CredentialsKeyVersion returns the value of the "credentials_key_version" field in the mutation.
+func (m *AccountMutation) CredentialsKeyVersion() (r int, exists bool) {
+	v := m.credentials_key_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCredentialsKeyVersion returns the old "credentials_key_version" field's value of the Account entity.
+// If the Account object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountMutation) OldCredentialsKeyVersion(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCredentialsKeyVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCredentialsKeyVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCredentialsKeyVersion: %w", err)
+	}
+	return oldValue.CredentialsKeyVersion, nil
+}
+
+// AddCredentialsKeyVersion adds i to the "credentials_key_version" field.
+func (m *AccountMutation) AddCredentialsKeyVersion(i int) {
+	if m.addcredentials_key_version != nil {
+		*m.addcredentials_key_version += i
+	} else {
+		m.addcredentials_key_version = &i
+	}
+}
+
+// AddedCredentialsKeyVersion returns the value that was added to the "credentials_key_version" field in this mutation.
+func (m *AccountMutation) AddedCredentialsKeyVersion() (r int, exists bool) {
+	v := m.addcredentials_key_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetCredentialsKeyVersion resets all changes to the "credentials_key_version" field.
+func (m *AccountMutation) ResetCredentialsKeyVersion() {
+	m.credentials_key_version = nil
+	m.addcredentials_key_version = nil
+}
+
+// SetCredentialsAadID sets the "credentials_aad_id" field.
+func (m *AccountMutation) SetCredentialsAadID(u uuid.UUID) {
+	m.credentials_aad_id = &u
+}
+
+// CredentialsAadID returns the value of the "credentials_aad_id" field in the mutation.
+func (m *AccountMutation) CredentialsAadID() (r uuid.UUID, exists bool) {
+	v := m.credentials_aad_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCredentialsAadID returns the old "credentials_aad_id" field's value of the Account entity.
+// If the Account object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountMutation) OldCredentialsAadID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCredentialsAadID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCredentialsAadID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCredentialsAadID: %w", err)
+	}
+	return oldValue.CredentialsAadID, nil
+}
+
+// ResetCredentialsAadID resets all changes to the "credentials_aad_id" field.
+func (m *AccountMutation) ResetCredentialsAadID() {
+	m.credentials_aad_id = nil
+}
+
+// SetCredentialsFingerprint sets the "credentials_fingerprint" field.
+func (m *AccountMutation) SetCredentialsFingerprint(s string) {
+	m.credentials_fingerprint = &s
+}
+
+// CredentialsFingerprint returns the value of the "credentials_fingerprint" field in the mutation.
+func (m *AccountMutation) CredentialsFingerprint() (r string, exists bool) {
+	v := m.credentials_fingerprint
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCredentialsFingerprint returns the old "credentials_fingerprint" field's value of the Account entity.
+// If the Account object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountMutation) OldCredentialsFingerprint(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCredentialsFingerprint is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCredentialsFingerprint requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCredentialsFingerprint: %w", err)
+	}
+	return oldValue.CredentialsFingerprint, nil
+}
+
+// ResetCredentialsFingerprint resets all changes to the "credentials_fingerprint" field.
+func (m *AccountMutation) ResetCredentialsFingerprint() {
+	m.credentials_fingerprint = nil
+}
+
+// SetCredentialsAPIKeyDigest sets the "credentials_api_key_digest" field.
+func (m *AccountMutation) SetCredentialsAPIKeyDigest(s string) {
+	m.credentials_api_key_digest = &s
+}
+
+// CredentialsAPIKeyDigest returns the value of the "credentials_api_key_digest" field in the mutation.
+func (m *AccountMutation) CredentialsAPIKeyDigest() (r string, exists bool) {
+	v := m.credentials_api_key_digest
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCredentialsAPIKeyDigest returns the old "credentials_api_key_digest" field's value of the Account entity.
+// If the Account object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountMutation) OldCredentialsAPIKeyDigest(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCredentialsAPIKeyDigest is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCredentialsAPIKeyDigest requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCredentialsAPIKeyDigest: %w", err)
+	}
+	return oldValue.CredentialsAPIKeyDigest, nil
+}
+
+// ResetCredentialsAPIKeyDigest resets all changes to the "credentials_api_key_digest" field.
+func (m *AccountMutation) ResetCredentialsAPIKeyDigest() {
+	m.credentials_api_key_digest = nil
+}
+
+// SetCredentialsHasRefreshToken sets the "credentials_has_refresh_token" field.
+func (m *AccountMutation) SetCredentialsHasRefreshToken(b bool) {
+	m.credentials_has_refresh_token = &b
+}
+
+// CredentialsHasRefreshToken returns the value of the "credentials_has_refresh_token" field in the mutation.
+func (m *AccountMutation) CredentialsHasRefreshToken() (r bool, exists bool) {
+	v := m.credentials_has_refresh_token
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCredentialsHasRefreshToken returns the old "credentials_has_refresh_token" field's value of the Account entity.
+// If the Account object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountMutation) OldCredentialsHasRefreshToken(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCredentialsHasRefreshToken is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCredentialsHasRefreshToken requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCredentialsHasRefreshToken: %w", err)
+	}
+	return oldValue.CredentialsHasRefreshToken, nil
+}
+
+// ResetCredentialsHasRefreshToken resets all changes to the "credentials_has_refresh_token" field.
+func (m *AccountMutation) ResetCredentialsHasRefreshToken() {
+	m.credentials_has_refresh_token = nil
+}
+
+// SetCredentialsMeta sets the "credentials_meta" field.
+func (m *AccountMutation) SetCredentialsMeta(value map[string]interface{}) {
+	m.credentials_meta = &value
+}
+
+// CredentialsMeta returns the value of the "credentials_meta" field in the mutation.
+func (m *AccountMutation) CredentialsMeta() (r map[string]interface{}, exists bool) {
+	v := m.credentials_meta
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCredentialsMeta returns the old "credentials_meta" field's value of the Account entity.
+// If the Account object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountMutation) OldCredentialsMeta(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCredentialsMeta is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCredentialsMeta requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCredentialsMeta: %w", err)
+	}
+	return oldValue.CredentialsMeta, nil
+}
+
+// ResetCredentialsMeta resets all changes to the "credentials_meta" field.
+func (m *AccountMutation) ResetCredentialsMeta() {
+	m.credentials_meta = nil
 }
 
 // SetExtra sets the "extra" field.
@@ -4392,7 +4673,7 @@ func (m *AccountMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *AccountMutation) Fields() []string {
-	fields := make([]string, 0, 31)
+	fields := make([]string, 0, 38)
 	if m.created_at != nil {
 		fields = append(fields, account.FieldCreatedAt)
 	}
@@ -4416,6 +4697,27 @@ func (m *AccountMutation) Fields() []string {
 	}
 	if m.credentials != nil {
 		fields = append(fields, account.FieldCredentials)
+	}
+	if m.credentials_encrypted != nil {
+		fields = append(fields, account.FieldCredentialsEncrypted)
+	}
+	if m.credentials_key_version != nil {
+		fields = append(fields, account.FieldCredentialsKeyVersion)
+	}
+	if m.credentials_aad_id != nil {
+		fields = append(fields, account.FieldCredentialsAadID)
+	}
+	if m.credentials_fingerprint != nil {
+		fields = append(fields, account.FieldCredentialsFingerprint)
+	}
+	if m.credentials_api_key_digest != nil {
+		fields = append(fields, account.FieldCredentialsAPIKeyDigest)
+	}
+	if m.credentials_has_refresh_token != nil {
+		fields = append(fields, account.FieldCredentialsHasRefreshToken)
+	}
+	if m.credentials_meta != nil {
+		fields = append(fields, account.FieldCredentialsMeta)
 	}
 	if m.extra != nil {
 		fields = append(fields, account.FieldExtra)
@@ -4510,6 +4812,20 @@ func (m *AccountMutation) Field(name string) (ent.Value, bool) {
 		return m.GetType()
 	case account.FieldCredentials:
 		return m.Credentials()
+	case account.FieldCredentialsEncrypted:
+		return m.CredentialsEncrypted()
+	case account.FieldCredentialsKeyVersion:
+		return m.CredentialsKeyVersion()
+	case account.FieldCredentialsAadID:
+		return m.CredentialsAadID()
+	case account.FieldCredentialsFingerprint:
+		return m.CredentialsFingerprint()
+	case account.FieldCredentialsAPIKeyDigest:
+		return m.CredentialsAPIKeyDigest()
+	case account.FieldCredentialsHasRefreshToken:
+		return m.CredentialsHasRefreshToken()
+	case account.FieldCredentialsMeta:
+		return m.CredentialsMeta()
 	case account.FieldExtra:
 		return m.Extra()
 	case account.FieldProxyID:
@@ -4581,6 +4897,20 @@ func (m *AccountMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldType(ctx)
 	case account.FieldCredentials:
 		return m.OldCredentials(ctx)
+	case account.FieldCredentialsEncrypted:
+		return m.OldCredentialsEncrypted(ctx)
+	case account.FieldCredentialsKeyVersion:
+		return m.OldCredentialsKeyVersion(ctx)
+	case account.FieldCredentialsAadID:
+		return m.OldCredentialsAadID(ctx)
+	case account.FieldCredentialsFingerprint:
+		return m.OldCredentialsFingerprint(ctx)
+	case account.FieldCredentialsAPIKeyDigest:
+		return m.OldCredentialsAPIKeyDigest(ctx)
+	case account.FieldCredentialsHasRefreshToken:
+		return m.OldCredentialsHasRefreshToken(ctx)
+	case account.FieldCredentialsMeta:
+		return m.OldCredentialsMeta(ctx)
 	case account.FieldExtra:
 		return m.OldExtra(ctx)
 	case account.FieldProxyID:
@@ -4691,6 +5021,55 @@ func (m *AccountMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCredentials(v)
+		return nil
+	case account.FieldCredentialsEncrypted:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCredentialsEncrypted(v)
+		return nil
+	case account.FieldCredentialsKeyVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCredentialsKeyVersion(v)
+		return nil
+	case account.FieldCredentialsAadID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCredentialsAadID(v)
+		return nil
+	case account.FieldCredentialsFingerprint:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCredentialsFingerprint(v)
+		return nil
+	case account.FieldCredentialsAPIKeyDigest:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCredentialsAPIKeyDigest(v)
+		return nil
+	case account.FieldCredentialsHasRefreshToken:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCredentialsHasRefreshToken(v)
+		return nil
+	case account.FieldCredentialsMeta:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCredentialsMeta(v)
 		return nil
 	case account.FieldExtra:
 		v, ok := value.(map[string]interface{})
@@ -4861,6 +5240,9 @@ func (m *AccountMutation) SetField(name string, value ent.Value) error {
 // this mutation.
 func (m *AccountMutation) AddedFields() []string {
 	var fields []string
+	if m.addcredentials_key_version != nil {
+		fields = append(fields, account.FieldCredentialsKeyVersion)
+	}
 	if m.addproxy_fallback_origin_id != nil {
 		fields = append(fields, account.FieldProxyFallbackOriginID)
 	}
@@ -4884,6 +5266,8 @@ func (m *AccountMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *AccountMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
+	case account.FieldCredentialsKeyVersion:
+		return m.AddedCredentialsKeyVersion()
 	case account.FieldProxyFallbackOriginID:
 		return m.AddedProxyFallbackOriginID()
 	case account.FieldConcurrency:
@@ -4903,6 +5287,13 @@ func (m *AccountMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *AccountMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case account.FieldCredentialsKeyVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCredentialsKeyVersion(v)
+		return nil
 	case account.FieldProxyFallbackOriginID:
 		v, ok := value.(int64)
 		if !ok {
@@ -5093,6 +5484,27 @@ func (m *AccountMutation) ResetField(name string) error {
 		return nil
 	case account.FieldCredentials:
 		m.ResetCredentials()
+		return nil
+	case account.FieldCredentialsEncrypted:
+		m.ResetCredentialsEncrypted()
+		return nil
+	case account.FieldCredentialsKeyVersion:
+		m.ResetCredentialsKeyVersion()
+		return nil
+	case account.FieldCredentialsAadID:
+		m.ResetCredentialsAadID()
+		return nil
+	case account.FieldCredentialsFingerprint:
+		m.ResetCredentialsFingerprint()
+		return nil
+	case account.FieldCredentialsAPIKeyDigest:
+		m.ResetCredentialsAPIKeyDigest()
+		return nil
+	case account.FieldCredentialsHasRefreshToken:
+		m.ResetCredentialsHasRefreshToken()
+		return nil
+	case account.FieldCredentialsMeta:
+		m.ResetCredentialsMeta()
 		return nil
 	case account.FieldExtra:
 		m.ResetExtra()

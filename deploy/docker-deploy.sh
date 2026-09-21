@@ -104,6 +104,7 @@ main() {
     JWT_SECRET=$(generate_secret)
     TOTP_ENCRYPTION_KEY=$(generate_secret)
     API_KEY_HMAC_ACTIVE_PEPPER=$(generate_secret)
+    ACCOUNT_CREDENTIALS_ACTIVE_KEY=$(generate_secret)
     POSTGRES_PASSWORD=$(generate_secret)
 
     # Create .env from .env.example
@@ -115,12 +116,14 @@ main() {
         sed -i "s/^JWT_SECRET=.*/JWT_SECRET=${JWT_SECRET}/" .env
         sed -i "s/^TOTP_ENCRYPTION_KEY=.*/TOTP_ENCRYPTION_KEY=${TOTP_ENCRYPTION_KEY}/" .env
         sed -i "s/^API_KEY_HMAC_ACTIVE_PEPPER=.*/API_KEY_HMAC_ACTIVE_PEPPER=${API_KEY_HMAC_ACTIVE_PEPPER}/" .env
+        sed -i "s/^ACCOUNT_CREDENTIALS_ACTIVE_KEY=.*/ACCOUNT_CREDENTIALS_ACTIVE_KEY=${ACCOUNT_CREDENTIALS_ACTIVE_KEY}/" .env
         sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${POSTGRES_PASSWORD}/" .env
     else
         # BSD sed (macOS)
         sed -i '' "s/^JWT_SECRET=.*/JWT_SECRET=${JWT_SECRET}/" .env
         sed -i '' "s/^TOTP_ENCRYPTION_KEY=.*/TOTP_ENCRYPTION_KEY=${TOTP_ENCRYPTION_KEY}/" .env
         sed -i '' "s/^API_KEY_HMAC_ACTIVE_PEPPER=.*/API_KEY_HMAC_ACTIVE_PEPPER=${API_KEY_HMAC_ACTIVE_PEPPER}/" .env
+        sed -i '' "s/^ACCOUNT_CREDENTIALS_ACTIVE_KEY=.*/ACCOUNT_CREDENTIALS_ACTIVE_KEY=${ACCOUNT_CREDENTIALS_ACTIVE_KEY}/" .env
         sed -i '' "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${POSTGRES_PASSWORD}/" .env
     fi
 

@@ -15,6 +15,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/proxy"
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
+	"github.com/google/uuid"
 )
 
 // AccountCreate is the builder for creating a Account entity.
@@ -102,6 +103,96 @@ func (_c *AccountCreate) SetType(v string) *AccountCreate {
 // SetCredentials sets the "credentials" field.
 func (_c *AccountCreate) SetCredentials(v map[string]interface{}) *AccountCreate {
 	_c.mutation.SetCredentials(v)
+	return _c
+}
+
+// SetCredentialsEncrypted sets the "credentials_encrypted" field.
+func (_c *AccountCreate) SetCredentialsEncrypted(v string) *AccountCreate {
+	_c.mutation.SetCredentialsEncrypted(v)
+	return _c
+}
+
+// SetNillableCredentialsEncrypted sets the "credentials_encrypted" field if the given value is not nil.
+func (_c *AccountCreate) SetNillableCredentialsEncrypted(v *string) *AccountCreate {
+	if v != nil {
+		_c.SetCredentialsEncrypted(*v)
+	}
+	return _c
+}
+
+// SetCredentialsKeyVersion sets the "credentials_key_version" field.
+func (_c *AccountCreate) SetCredentialsKeyVersion(v int) *AccountCreate {
+	_c.mutation.SetCredentialsKeyVersion(v)
+	return _c
+}
+
+// SetNillableCredentialsKeyVersion sets the "credentials_key_version" field if the given value is not nil.
+func (_c *AccountCreate) SetNillableCredentialsKeyVersion(v *int) *AccountCreate {
+	if v != nil {
+		_c.SetCredentialsKeyVersion(*v)
+	}
+	return _c
+}
+
+// SetCredentialsAadID sets the "credentials_aad_id" field.
+func (_c *AccountCreate) SetCredentialsAadID(v uuid.UUID) *AccountCreate {
+	_c.mutation.SetCredentialsAadID(v)
+	return _c
+}
+
+// SetNillableCredentialsAadID sets the "credentials_aad_id" field if the given value is not nil.
+func (_c *AccountCreate) SetNillableCredentialsAadID(v *uuid.UUID) *AccountCreate {
+	if v != nil {
+		_c.SetCredentialsAadID(*v)
+	}
+	return _c
+}
+
+// SetCredentialsFingerprint sets the "credentials_fingerprint" field.
+func (_c *AccountCreate) SetCredentialsFingerprint(v string) *AccountCreate {
+	_c.mutation.SetCredentialsFingerprint(v)
+	return _c
+}
+
+// SetNillableCredentialsFingerprint sets the "credentials_fingerprint" field if the given value is not nil.
+func (_c *AccountCreate) SetNillableCredentialsFingerprint(v *string) *AccountCreate {
+	if v != nil {
+		_c.SetCredentialsFingerprint(*v)
+	}
+	return _c
+}
+
+// SetCredentialsAPIKeyDigest sets the "credentials_api_key_digest" field.
+func (_c *AccountCreate) SetCredentialsAPIKeyDigest(v string) *AccountCreate {
+	_c.mutation.SetCredentialsAPIKeyDigest(v)
+	return _c
+}
+
+// SetNillableCredentialsAPIKeyDigest sets the "credentials_api_key_digest" field if the given value is not nil.
+func (_c *AccountCreate) SetNillableCredentialsAPIKeyDigest(v *string) *AccountCreate {
+	if v != nil {
+		_c.SetCredentialsAPIKeyDigest(*v)
+	}
+	return _c
+}
+
+// SetCredentialsHasRefreshToken sets the "credentials_has_refresh_token" field.
+func (_c *AccountCreate) SetCredentialsHasRefreshToken(v bool) *AccountCreate {
+	_c.mutation.SetCredentialsHasRefreshToken(v)
+	return _c
+}
+
+// SetNillableCredentialsHasRefreshToken sets the "credentials_has_refresh_token" field if the given value is not nil.
+func (_c *AccountCreate) SetNillableCredentialsHasRefreshToken(v *bool) *AccountCreate {
+	if v != nil {
+		_c.SetCredentialsHasRefreshToken(*v)
+	}
+	return _c
+}
+
+// SetCredentialsMeta sets the "credentials_meta" field.
+func (_c *AccountCreate) SetCredentialsMeta(v map[string]interface{}) *AccountCreate {
+	_c.mutation.SetCredentialsMeta(v)
 	return _c
 }
 
@@ -546,6 +637,40 @@ func (_c *AccountCreate) defaults() error {
 		v := account.DefaultCredentials()
 		_c.mutation.SetCredentials(v)
 	}
+	if _, ok := _c.mutation.CredentialsEncrypted(); !ok {
+		v := account.DefaultCredentialsEncrypted
+		_c.mutation.SetCredentialsEncrypted(v)
+	}
+	if _, ok := _c.mutation.CredentialsKeyVersion(); !ok {
+		v := account.DefaultCredentialsKeyVersion
+		_c.mutation.SetCredentialsKeyVersion(v)
+	}
+	if _, ok := _c.mutation.CredentialsAadID(); !ok {
+		if account.DefaultCredentialsAadID == nil {
+			return fmt.Errorf("ent: uninitialized account.DefaultCredentialsAadID (forgotten import ent/runtime?)")
+		}
+		v := account.DefaultCredentialsAadID()
+		_c.mutation.SetCredentialsAadID(v)
+	}
+	if _, ok := _c.mutation.CredentialsFingerprint(); !ok {
+		v := account.DefaultCredentialsFingerprint
+		_c.mutation.SetCredentialsFingerprint(v)
+	}
+	if _, ok := _c.mutation.CredentialsAPIKeyDigest(); !ok {
+		v := account.DefaultCredentialsAPIKeyDigest
+		_c.mutation.SetCredentialsAPIKeyDigest(v)
+	}
+	if _, ok := _c.mutation.CredentialsHasRefreshToken(); !ok {
+		v := account.DefaultCredentialsHasRefreshToken
+		_c.mutation.SetCredentialsHasRefreshToken(v)
+	}
+	if _, ok := _c.mutation.CredentialsMeta(); !ok {
+		if account.DefaultCredentialsMeta == nil {
+			return fmt.Errorf("ent: uninitialized account.DefaultCredentialsMeta (forgotten import ent/runtime?)")
+		}
+		v := account.DefaultCredentialsMeta()
+		_c.mutation.SetCredentialsMeta(v)
+	}
 	if _, ok := _c.mutation.Extra(); !ok {
 		if account.DefaultExtra == nil {
 			return fmt.Errorf("ent: uninitialized account.DefaultExtra (forgotten import ent/runtime?)")
@@ -618,6 +743,42 @@ func (_c *AccountCreate) check() error {
 	}
 	if _, ok := _c.mutation.Credentials(); !ok {
 		return &ValidationError{Name: "credentials", err: errors.New(`ent: missing required field "Account.credentials"`)}
+	}
+	if _, ok := _c.mutation.CredentialsEncrypted(); !ok {
+		return &ValidationError{Name: "credentials_encrypted", err: errors.New(`ent: missing required field "Account.credentials_encrypted"`)}
+	}
+	if _, ok := _c.mutation.CredentialsKeyVersion(); !ok {
+		return &ValidationError{Name: "credentials_key_version", err: errors.New(`ent: missing required field "Account.credentials_key_version"`)}
+	}
+	if v, ok := _c.mutation.CredentialsKeyVersion(); ok {
+		if err := account.CredentialsKeyVersionValidator(v); err != nil {
+			return &ValidationError{Name: "credentials_key_version", err: fmt.Errorf(`ent: validator failed for field "Account.credentials_key_version": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.CredentialsAadID(); !ok {
+		return &ValidationError{Name: "credentials_aad_id", err: errors.New(`ent: missing required field "Account.credentials_aad_id"`)}
+	}
+	if _, ok := _c.mutation.CredentialsFingerprint(); !ok {
+		return &ValidationError{Name: "credentials_fingerprint", err: errors.New(`ent: missing required field "Account.credentials_fingerprint"`)}
+	}
+	if v, ok := _c.mutation.CredentialsFingerprint(); ok {
+		if err := account.CredentialsFingerprintValidator(v); err != nil {
+			return &ValidationError{Name: "credentials_fingerprint", err: fmt.Errorf(`ent: validator failed for field "Account.credentials_fingerprint": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.CredentialsAPIKeyDigest(); !ok {
+		return &ValidationError{Name: "credentials_api_key_digest", err: errors.New(`ent: missing required field "Account.credentials_api_key_digest"`)}
+	}
+	if v, ok := _c.mutation.CredentialsAPIKeyDigest(); ok {
+		if err := account.CredentialsAPIKeyDigestValidator(v); err != nil {
+			return &ValidationError{Name: "credentials_api_key_digest", err: fmt.Errorf(`ent: validator failed for field "Account.credentials_api_key_digest": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.CredentialsHasRefreshToken(); !ok {
+		return &ValidationError{Name: "credentials_has_refresh_token", err: errors.New(`ent: missing required field "Account.credentials_has_refresh_token"`)}
+	}
+	if _, ok := _c.mutation.CredentialsMeta(); !ok {
+		return &ValidationError{Name: "credentials_meta", err: errors.New(`ent: missing required field "Account.credentials_meta"`)}
 	}
 	if _, ok := _c.mutation.Extra(); !ok {
 		return &ValidationError{Name: "extra", err: errors.New(`ent: missing required field "Account.extra"`)}
@@ -716,6 +877,34 @@ func (_c *AccountCreate) createSpec() (*Account, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Credentials(); ok {
 		_spec.SetField(account.FieldCredentials, field.TypeJSON, value)
 		_node.Credentials = value
+	}
+	if value, ok := _c.mutation.CredentialsEncrypted(); ok {
+		_spec.SetField(account.FieldCredentialsEncrypted, field.TypeString, value)
+		_node.CredentialsEncrypted = value
+	}
+	if value, ok := _c.mutation.CredentialsKeyVersion(); ok {
+		_spec.SetField(account.FieldCredentialsKeyVersion, field.TypeInt, value)
+		_node.CredentialsKeyVersion = value
+	}
+	if value, ok := _c.mutation.CredentialsAadID(); ok {
+		_spec.SetField(account.FieldCredentialsAadID, field.TypeUUID, value)
+		_node.CredentialsAadID = value
+	}
+	if value, ok := _c.mutation.CredentialsFingerprint(); ok {
+		_spec.SetField(account.FieldCredentialsFingerprint, field.TypeString, value)
+		_node.CredentialsFingerprint = value
+	}
+	if value, ok := _c.mutation.CredentialsAPIKeyDigest(); ok {
+		_spec.SetField(account.FieldCredentialsAPIKeyDigest, field.TypeString, value)
+		_node.CredentialsAPIKeyDigest = value
+	}
+	if value, ok := _c.mutation.CredentialsHasRefreshToken(); ok {
+		_spec.SetField(account.FieldCredentialsHasRefreshToken, field.TypeBool, value)
+		_node.CredentialsHasRefreshToken = value
+	}
+	if value, ok := _c.mutation.CredentialsMeta(); ok {
+		_spec.SetField(account.FieldCredentialsMeta, field.TypeJSON, value)
+		_node.CredentialsMeta = value
 	}
 	if value, ok := _c.mutation.Extra(); ok {
 		_spec.SetField(account.FieldExtra, field.TypeJSON, value)
@@ -1032,6 +1221,96 @@ func (u *AccountUpsert) SetCredentials(v map[string]interface{}) *AccountUpsert 
 // UpdateCredentials sets the "credentials" field to the value that was provided on create.
 func (u *AccountUpsert) UpdateCredentials() *AccountUpsert {
 	u.SetExcluded(account.FieldCredentials)
+	return u
+}
+
+// SetCredentialsEncrypted sets the "credentials_encrypted" field.
+func (u *AccountUpsert) SetCredentialsEncrypted(v string) *AccountUpsert {
+	u.Set(account.FieldCredentialsEncrypted, v)
+	return u
+}
+
+// UpdateCredentialsEncrypted sets the "credentials_encrypted" field to the value that was provided on create.
+func (u *AccountUpsert) UpdateCredentialsEncrypted() *AccountUpsert {
+	u.SetExcluded(account.FieldCredentialsEncrypted)
+	return u
+}
+
+// SetCredentialsKeyVersion sets the "credentials_key_version" field.
+func (u *AccountUpsert) SetCredentialsKeyVersion(v int) *AccountUpsert {
+	u.Set(account.FieldCredentialsKeyVersion, v)
+	return u
+}
+
+// UpdateCredentialsKeyVersion sets the "credentials_key_version" field to the value that was provided on create.
+func (u *AccountUpsert) UpdateCredentialsKeyVersion() *AccountUpsert {
+	u.SetExcluded(account.FieldCredentialsKeyVersion)
+	return u
+}
+
+// AddCredentialsKeyVersion adds v to the "credentials_key_version" field.
+func (u *AccountUpsert) AddCredentialsKeyVersion(v int) *AccountUpsert {
+	u.Add(account.FieldCredentialsKeyVersion, v)
+	return u
+}
+
+// SetCredentialsAadID sets the "credentials_aad_id" field.
+func (u *AccountUpsert) SetCredentialsAadID(v uuid.UUID) *AccountUpsert {
+	u.Set(account.FieldCredentialsAadID, v)
+	return u
+}
+
+// UpdateCredentialsAadID sets the "credentials_aad_id" field to the value that was provided on create.
+func (u *AccountUpsert) UpdateCredentialsAadID() *AccountUpsert {
+	u.SetExcluded(account.FieldCredentialsAadID)
+	return u
+}
+
+// SetCredentialsFingerprint sets the "credentials_fingerprint" field.
+func (u *AccountUpsert) SetCredentialsFingerprint(v string) *AccountUpsert {
+	u.Set(account.FieldCredentialsFingerprint, v)
+	return u
+}
+
+// UpdateCredentialsFingerprint sets the "credentials_fingerprint" field to the value that was provided on create.
+func (u *AccountUpsert) UpdateCredentialsFingerprint() *AccountUpsert {
+	u.SetExcluded(account.FieldCredentialsFingerprint)
+	return u
+}
+
+// SetCredentialsAPIKeyDigest sets the "credentials_api_key_digest" field.
+func (u *AccountUpsert) SetCredentialsAPIKeyDigest(v string) *AccountUpsert {
+	u.Set(account.FieldCredentialsAPIKeyDigest, v)
+	return u
+}
+
+// UpdateCredentialsAPIKeyDigest sets the "credentials_api_key_digest" field to the value that was provided on create.
+func (u *AccountUpsert) UpdateCredentialsAPIKeyDigest() *AccountUpsert {
+	u.SetExcluded(account.FieldCredentialsAPIKeyDigest)
+	return u
+}
+
+// SetCredentialsHasRefreshToken sets the "credentials_has_refresh_token" field.
+func (u *AccountUpsert) SetCredentialsHasRefreshToken(v bool) *AccountUpsert {
+	u.Set(account.FieldCredentialsHasRefreshToken, v)
+	return u
+}
+
+// UpdateCredentialsHasRefreshToken sets the "credentials_has_refresh_token" field to the value that was provided on create.
+func (u *AccountUpsert) UpdateCredentialsHasRefreshToken() *AccountUpsert {
+	u.SetExcluded(account.FieldCredentialsHasRefreshToken)
+	return u
+}
+
+// SetCredentialsMeta sets the "credentials_meta" field.
+func (u *AccountUpsert) SetCredentialsMeta(v map[string]interface{}) *AccountUpsert {
+	u.Set(account.FieldCredentialsMeta, v)
+	return u
+}
+
+// UpdateCredentialsMeta sets the "credentials_meta" field to the value that was provided on create.
+func (u *AccountUpsert) UpdateCredentialsMeta() *AccountUpsert {
+	u.SetExcluded(account.FieldCredentialsMeta)
 	return u
 }
 
@@ -1585,6 +1864,111 @@ func (u *AccountUpsertOne) SetCredentials(v map[string]interface{}) *AccountUpse
 func (u *AccountUpsertOne) UpdateCredentials() *AccountUpsertOne {
 	return u.Update(func(s *AccountUpsert) {
 		s.UpdateCredentials()
+	})
+}
+
+// SetCredentialsEncrypted sets the "credentials_encrypted" field.
+func (u *AccountUpsertOne) SetCredentialsEncrypted(v string) *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetCredentialsEncrypted(v)
+	})
+}
+
+// UpdateCredentialsEncrypted sets the "credentials_encrypted" field to the value that was provided on create.
+func (u *AccountUpsertOne) UpdateCredentialsEncrypted() *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateCredentialsEncrypted()
+	})
+}
+
+// SetCredentialsKeyVersion sets the "credentials_key_version" field.
+func (u *AccountUpsertOne) SetCredentialsKeyVersion(v int) *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetCredentialsKeyVersion(v)
+	})
+}
+
+// AddCredentialsKeyVersion adds v to the "credentials_key_version" field.
+func (u *AccountUpsertOne) AddCredentialsKeyVersion(v int) *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.AddCredentialsKeyVersion(v)
+	})
+}
+
+// UpdateCredentialsKeyVersion sets the "credentials_key_version" field to the value that was provided on create.
+func (u *AccountUpsertOne) UpdateCredentialsKeyVersion() *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateCredentialsKeyVersion()
+	})
+}
+
+// SetCredentialsAadID sets the "credentials_aad_id" field.
+func (u *AccountUpsertOne) SetCredentialsAadID(v uuid.UUID) *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetCredentialsAadID(v)
+	})
+}
+
+// UpdateCredentialsAadID sets the "credentials_aad_id" field to the value that was provided on create.
+func (u *AccountUpsertOne) UpdateCredentialsAadID() *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateCredentialsAadID()
+	})
+}
+
+// SetCredentialsFingerprint sets the "credentials_fingerprint" field.
+func (u *AccountUpsertOne) SetCredentialsFingerprint(v string) *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetCredentialsFingerprint(v)
+	})
+}
+
+// UpdateCredentialsFingerprint sets the "credentials_fingerprint" field to the value that was provided on create.
+func (u *AccountUpsertOne) UpdateCredentialsFingerprint() *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateCredentialsFingerprint()
+	})
+}
+
+// SetCredentialsAPIKeyDigest sets the "credentials_api_key_digest" field.
+func (u *AccountUpsertOne) SetCredentialsAPIKeyDigest(v string) *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetCredentialsAPIKeyDigest(v)
+	})
+}
+
+// UpdateCredentialsAPIKeyDigest sets the "credentials_api_key_digest" field to the value that was provided on create.
+func (u *AccountUpsertOne) UpdateCredentialsAPIKeyDigest() *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateCredentialsAPIKeyDigest()
+	})
+}
+
+// SetCredentialsHasRefreshToken sets the "credentials_has_refresh_token" field.
+func (u *AccountUpsertOne) SetCredentialsHasRefreshToken(v bool) *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetCredentialsHasRefreshToken(v)
+	})
+}
+
+// UpdateCredentialsHasRefreshToken sets the "credentials_has_refresh_token" field to the value that was provided on create.
+func (u *AccountUpsertOne) UpdateCredentialsHasRefreshToken() *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateCredentialsHasRefreshToken()
+	})
+}
+
+// SetCredentialsMeta sets the "credentials_meta" field.
+func (u *AccountUpsertOne) SetCredentialsMeta(v map[string]interface{}) *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetCredentialsMeta(v)
+	})
+}
+
+// UpdateCredentialsMeta sets the "credentials_meta" field to the value that was provided on create.
+func (u *AccountUpsertOne) UpdateCredentialsMeta() *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateCredentialsMeta()
 	})
 }
 
@@ -2370,6 +2754,111 @@ func (u *AccountUpsertBulk) SetCredentials(v map[string]interface{}) *AccountUps
 func (u *AccountUpsertBulk) UpdateCredentials() *AccountUpsertBulk {
 	return u.Update(func(s *AccountUpsert) {
 		s.UpdateCredentials()
+	})
+}
+
+// SetCredentialsEncrypted sets the "credentials_encrypted" field.
+func (u *AccountUpsertBulk) SetCredentialsEncrypted(v string) *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetCredentialsEncrypted(v)
+	})
+}
+
+// UpdateCredentialsEncrypted sets the "credentials_encrypted" field to the value that was provided on create.
+func (u *AccountUpsertBulk) UpdateCredentialsEncrypted() *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateCredentialsEncrypted()
+	})
+}
+
+// SetCredentialsKeyVersion sets the "credentials_key_version" field.
+func (u *AccountUpsertBulk) SetCredentialsKeyVersion(v int) *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetCredentialsKeyVersion(v)
+	})
+}
+
+// AddCredentialsKeyVersion adds v to the "credentials_key_version" field.
+func (u *AccountUpsertBulk) AddCredentialsKeyVersion(v int) *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.AddCredentialsKeyVersion(v)
+	})
+}
+
+// UpdateCredentialsKeyVersion sets the "credentials_key_version" field to the value that was provided on create.
+func (u *AccountUpsertBulk) UpdateCredentialsKeyVersion() *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateCredentialsKeyVersion()
+	})
+}
+
+// SetCredentialsAadID sets the "credentials_aad_id" field.
+func (u *AccountUpsertBulk) SetCredentialsAadID(v uuid.UUID) *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetCredentialsAadID(v)
+	})
+}
+
+// UpdateCredentialsAadID sets the "credentials_aad_id" field to the value that was provided on create.
+func (u *AccountUpsertBulk) UpdateCredentialsAadID() *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateCredentialsAadID()
+	})
+}
+
+// SetCredentialsFingerprint sets the "credentials_fingerprint" field.
+func (u *AccountUpsertBulk) SetCredentialsFingerprint(v string) *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetCredentialsFingerprint(v)
+	})
+}
+
+// UpdateCredentialsFingerprint sets the "credentials_fingerprint" field to the value that was provided on create.
+func (u *AccountUpsertBulk) UpdateCredentialsFingerprint() *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateCredentialsFingerprint()
+	})
+}
+
+// SetCredentialsAPIKeyDigest sets the "credentials_api_key_digest" field.
+func (u *AccountUpsertBulk) SetCredentialsAPIKeyDigest(v string) *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetCredentialsAPIKeyDigest(v)
+	})
+}
+
+// UpdateCredentialsAPIKeyDigest sets the "credentials_api_key_digest" field to the value that was provided on create.
+func (u *AccountUpsertBulk) UpdateCredentialsAPIKeyDigest() *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateCredentialsAPIKeyDigest()
+	})
+}
+
+// SetCredentialsHasRefreshToken sets the "credentials_has_refresh_token" field.
+func (u *AccountUpsertBulk) SetCredentialsHasRefreshToken(v bool) *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetCredentialsHasRefreshToken(v)
+	})
+}
+
+// UpdateCredentialsHasRefreshToken sets the "credentials_has_refresh_token" field to the value that was provided on create.
+func (u *AccountUpsertBulk) UpdateCredentialsHasRefreshToken() *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateCredentialsHasRefreshToken()
+	})
+}
+
+// SetCredentialsMeta sets the "credentials_meta" field.
+func (u *AccountUpsertBulk) SetCredentialsMeta(v map[string]interface{}) *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetCredentialsMeta(v)
+	})
+}
+
+// UpdateCredentialsMeta sets the "credentials_meta" field to the value that was provided on create.
+func (u *AccountUpsertBulk) UpdateCredentialsMeta() *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateCredentialsMeta()
 	})
 }
 

@@ -89,14 +89,14 @@ Pepper 轮换不能脱离 Key 原文离线重算。轮换窗口内后端只加�
 使用独立 AES 256 GCM envelope：
 
 1. 每条凭据随机 Nonce。
-2. AAD 包含 account ID、platform 和 key version。
+2. AAD 包含每账号独立 `credentials_aad_id`、platform 和 key version。
 3. 密文和 key version 写数据库，主密钥在数据库外。
 4. 解密只发生在 Provider 调用与 Token refresh 的最小范围。
 5. 内存日志和 panic recovery 禁止 dump credentials map。
 6. Admin DTO 只返回 masked value 和 configured flag。
 7. 备份只包含密文，主密钥单独保存。
 
-`backend/internal/repository/aes_encryptor.go` 已实现 AES 256 GCM，可抽取通用接口。Account 凭据必须使用新密钥域，不能继续使用 TOTP Key。
+M6.5 使用独立的 versioned keyring 实现 AES-256-GCM、keyed fingerprint 和有限 active/previous 轮换；Account 凭据密钥域不复用 TOTP Key。
 
 ## 7. 身份、Admin 与权限
 

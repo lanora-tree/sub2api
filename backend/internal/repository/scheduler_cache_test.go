@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/accountcredential"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/stretchr/testify/require"
 )
@@ -13,11 +14,41 @@ func TestFilterSchedulerCredentialsKeepsSubscriptionPlanType(t *testing.T) {
 		"plan_type":     "plus",
 		"access_token":  "secret-access-token",
 		"refresh_token": "secret-refresh-token",
+		"api_key":       "secret-api-key",
 	})
 
 	require.Equal(t, "plus", filtered["plan_type"])
 	require.NotContains(t, filtered, "access_token")
 	require.NotContains(t, filtered, "refresh_token")
+	require.NotContains(t, filtered, "api_key")
+}
+
+func TestSchedulerFullAccountPayloadIsEncrypted(t *testing.T) {
+	keyring, err := accountcredential.NewKeyring(7, strings.Repeat("42", 32), 0, "", "")
+	require.NoError(t, err)
+	account := service.Account{
+		ID:       42,
+		Platform: service.PlatformOpenAI,
+		Type:     service.AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"api_key":       "upstream-secret-api-key",
+			"refresh_token": "upstream-secret-refresh-token",
+		},
+	}
+
+	full, metadata, err := marshalSchedulerCacheAccount(account, keyring)
+	require.NoError(t, err)
+	require.NotContains(t, string(full), "upstream-secret-api-key")
+	require.NotContains(t, string(full), "upstream-secret-refresh-token")
+	require.NotContains(t, string(metadata), "upstream-secret-api-key")
+	require.NotContains(t, string(metadata), "upstream-secret-refresh-token")
+
+	decoded, err := decodeCachedAccountWithKeyring(full, account.ID, keyring)
+	require.NoError(t, err)
+	require.Equal(t, account.Credentials, decoded.Credentials)
+
+	_, err = decodeCachedAccountWithKeyring(full, account.ID+1, keyring)
+	require.ErrorContains(t, err, "authenticate account credential cache ciphertext")
 }
 
 func TestSchedulerMetadataAccountKeepsOpenAISubscriptionIdentity(t *testing.T) {
